@@ -1,0 +1,31 @@
+# AI Novelty and Feasibility Audit: Tensor Core Accelerated 3D Convolution for Medical Image Segmentation
+
+This audit follows two adversarial passes, novelty and feasibility, searching actively for reasons the idea fails or already exists rather than reasons it works.
+
+## AI Critique Summary
+
+Is this genuinely novel? Yes, narrowly. Memory-efficient, Tensor-Core-targeting convolution is not a new idea: it has been developed across four real papers from 2023 to 2026 by the same research group. What has never been done, confirmed by reading all four papers in full text, is extending that specific technique beyond standard two-dimensional convolution. A dedicated search found that the adjacent depthwise-convolution variant already has recent CUDA optimization work, so this project does not target that; it targets three-dimensional convolution, which remains unaddressed. Three other recent efficiency approaches for 3D medical segmentation were found and reviewed, and each pursues efficiency at the architecture or representation level, not the convolution kernel level, which keeps this project's specific angle open. The main risk to disclose honestly: the seed technique's own evaluation is a synthetic microbenchmark with no trained model behind it, so this project's real contribution is closing that gap by integrating the technique into an actual trained, evaluated system, not simply re-running the same benchmark in three dimensions. A second risk: this field moves quickly, a comparable variant was closed within months of its parent paper's publication, so the specific three-dimensional gap should be re-verified immediately before final submission, not assumed stable.
+
+## Novelty Audit: Survives with Named Limitations
+
+**Why it survives.** Four papers spanning 2023 to 2026, all from the same research lineage, were read in full text and confirmed to cover only standard two-dimensional convolution. A dedicated search for the closest adjacent variant, depthwise convolution, found it already addressed by an April 2026 paper, confirming the search methodology can and does find real competing work when it exists. No comparable search result was found for three-dimensional or volumetric extensions of this specific technique.
+
+**Named limitation 1.** This is a narrow, single-lineage extension of one technique to one additional dimensionality, not a general architectural claim, and should be presented that way rather than as a broad "faster 3D deep learning" claim.
+
+**Named limitation 2.** The technique's own published evaluation is a synthetic microbenchmark across twelve layer shapes, with no real dataset or trained model behind it. This project's contribution is specifically closing that gap, and this should be stated directly rather than implied.
+
+**Named limitation 3.** This research area changes on a timescale of weeks rather than months. A final search should be repeated immediately before submission to confirm no closer work has appeared since this audit.
+
+## Feasibility Audit: Survives with Named Limitations
+
+Based only on verified resource facts, not duration estimates.
+
+**Code and technique access.** The Im2win codebase is real, substantive, Apache-2.0 licensed, and actively maintained. Wrapping its CUDA implementation as a PyTorch-compatible extension follows PyTorch's own documented pattern for custom CUDA extensions, a standard and well-established procedure, not a novel engineering risk.
+
+**Baseline access.** Both baselines have real, substantive, actively maintained, permissively licensed code: nnU-Net and MedNeXt. A third candidate baseline considered earlier, a transformer-based architecture named Primus, was checked directly and found to have no released code, and was dropped in favor of MedNeXt.
+
+**Data access.** The Medical Segmentation Decathlon is fully public with no registration, application, or approval process, available through multiple independent channels.
+
+**Compute access.** No GPU architecture compatibility risk is expected, since the technique's original evaluation and this project's target hardware are from the same generation family. Estimated total cost of $60 to $200 for the full training and benchmarking sweep on a rented GPU.
+
+**Named limitation.** MedNeXt uses larger convolution kernels than Im2win's original evaluation was designed around. This should be checked in the first week of implementation, before committing to full-scale training runs, to confirm the windowing scheme extends cleanly to those kernel sizes.
