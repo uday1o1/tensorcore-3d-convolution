@@ -6,7 +6,7 @@
 
 ## 1. Problem Formulation
 
-**Why three-dimensional convolution, not two-dimensional.** A CT or MRI scan is a stack of slices, but the structures inside it, a tumor's shape, a vessel's path, do not stop at a slice boundary; they have continuity across the depth axis. A model that processes each slice independently with two-dimensional convolution cannot directly represent that continuity. This is why the field's standard tools are built on true 3D convolution rather than per-slice 2D processing: nnU-Net's own paper states that medical image segmentation is dominated by CNNs built on "2D and 3D vanilla U-Nets," and both baselines used in this project, nnU-Net and MedNeXt, are 3D architectures for exactly this reason.
+**Why three-dimensional convolution, not two-dimensional.** A CT or MRI scan is a stack of slices, but the structures inside it, a tumor's shape, a vessel's path, do not stop at a slice boundary; they have continuity across the depth axis. A model that processes each slice independently with two-dimensional convolution cannot directly represent that continuity. This is why the field's standard tools are built on true 3D convolution rather than per-slice 2D processing: nnU-Net's own paper states directly that "medical image segmentation is currently dominated by deep convolutional neural networks," and describes nnU-Net itself as "a robust and self-adapting framework on the basis of 2D and 3D vanilla U-Nets." Both baselines used in this project, nnU-Net and MedNeXt, are 3D architectures for exactly this reason.
 
 **The technique this project extends.** Im2win is a memory-efficient convolution method with dedicated Tensor Core support, refined across four papers from 2023 to 2026. Its most recent version reports up to 2.8 times higher throughput than a plain CUDA implementation, 1.4 times higher than cuDNN, and 6.4 times higher than cuBLAS-based convolution, at 35 to 53 percent of the memory, measured on an RTX 3090. All four papers were checked directly, not from memory or abstract, and none mentions three-dimensional or volumetric convolution anywhere. This is the specific gap: a real, working efficiency technique exists, but it has never reached the dimensionality medical segmentation actually requires.
 
@@ -41,7 +41,7 @@ Null-result framing, fixed in advance: a null or negative result on either effic
 
 **Implementation plan.**
 
-1. Check Im2win's windowing scheme against MedNeXt's actual kernel sizes in week one. MedNeXt uses larger kernels than Im2win's original 2D evaluation targeted, and this must be confirmed compatible before full training runs are scheduled.
+1. Check Im2win's windowing scheme against MedNeXt's actual kernel shapes in week one. Im2win has only ever been tested on 2D kernel shapes (its 2026 evaluation covers sizes up to 11 in a single spatial dimension); MedNeXt uses 3D kernels reported at sizes 3 and 5 per axis. The open question is not kernel size but dimensionality and shape, since the windowing scheme has never been exercised on a genuinely three-dimensional kernel at any size, and this must be confirmed compatible before full training runs are scheduled.
 2. Generalize the windowing computation to three spatial dimensions and implement it as a CUDA extension.
 3. Validate the extension in isolation, on synthetic 3D convolution shapes, against standard cuDNN 3D convolution for correctness and speed.
 4. Train nnU-Net and standard MedNeXt as baselines on the chosen task.
@@ -50,4 +50,4 @@ Null-result framing, fixed in advance: a null or negative result on either effic
 
 ## 3. Device Available and Maintainer
 
-Device available: NVIDIA RTX 5050 (Uday Arora). Maintainer: Uday Arora; Claude Code access is requested to support implementation throughout the semester.
+Device available: NVIDIA RTX 5050 (desktop) (Uday Arora). Maintainer: Uday Arora; Claude Code access is requested to support implementation throughout the semester.
