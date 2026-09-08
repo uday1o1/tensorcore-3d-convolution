@@ -22,7 +22,7 @@ Based only on verified resource facts, not duration estimates.
 
 **Code and technique access.** The Im2win codebase is real, substantive, Apache-2.0 licensed, and actively maintained. Wrapping its CUDA implementation as a PyTorch-compatible extension follows PyTorch's own documented pattern for custom CUDA extensions, a standard and well-established procedure, not a novel engineering risk.
 
-**Baseline access.** Both baselines have real, substantive, actively maintained, permissively licensed code: nnU-Net and MedNeXt. A third candidate baseline considered earlier, a transformer-based architecture named Primus, was checked directly and found to have no released code, and was dropped in favor of MedNeXt.
+**Baseline access.** Both baselines have real, substantive, permissively licensed code. nnU-Net is actively maintained, last pushed July 2026. MedNeXt's own repository is complete and directly usable but not under active development, last pushed November 2024; its continuation lives in the separately-cited MedNeXt-v2 paper, whose own code release was not verified in this pass. A third candidate baseline considered earlier, a transformer-based architecture named Primus, was checked directly and found to have no released code, and was dropped in favor of MedNeXt.
 
 **Data access.** The Medical Segmentation Decathlon is fully public with no registration, application, or approval process, available through multiple independent channels.
 

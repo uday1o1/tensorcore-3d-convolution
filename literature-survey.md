@@ -28,7 +28,7 @@ Second baseline. The preprint states directly: "Medical Image Segmentation is cu
 
 ### 4. "Johnson-Lindenstrauss Lemma Guided Network for Efficient 3D Medical Segmentation." [arXiv:2509.22307](https://arxiv.org/abs/2509.22307), September 2025
 
-Read at abstract level. Pursues efficiency in 3D segmentation through a dimensionality-reduction-guided architecture rather than a convolution kernel change. Evidence that efficient 3D medical segmentation is an active area, approached here at the architecture level rather than the GPU kernel level.
+Read at abstract level. Its core component, Johnson-Lindenstrauss lemma-guided convolution, is itself a convolution-level change, so this is not a claim that no other project touches convolution. The distinction is what kind of change: this source changes what the convolution computes, using a dimensionality-reduction technique to reduce the operation itself, while this project changes how an already-defined, unchanged convolution is executed on the GPU. Evidence that efficient 3D medical segmentation is an active area, approached here through the computation being performed rather than its execution.
 
 ### 5. "TokenSeg: Efficient 3D Medical Image Segmentation via Hierarchical Visual Token Compression." [arXiv:2601.04519](https://arxiv.org/abs/2601.04519), January 2026
 
