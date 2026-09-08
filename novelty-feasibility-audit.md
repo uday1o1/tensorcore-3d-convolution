@@ -16,6 +16,8 @@ Is this genuinely novel? Yes, narrowly. Memory-efficient, Tensor-Core-targeting 
 
 **Named limitation 3.** This research area changes on a timescale of weeks rather than months. A final search should be repeated immediately before submission to confirm no closer work has appeared since this audit.
 
+**Update, final independent review.** A fresh, uninvolved reviewer re-checked every claim in this project against primary sources and found the citation work accurate throughout, but identified two real, now-fixed gaps: Option 1-D as originally written claimed only one improvement category (efficiency) against the course's literal "at least two" requirement, and the two original baselines (nnU-Net, MedNeXt) both predate the strict recency window, which the survey itself had already flagged but not resolved. Both are fixed: a second category, an architectural experiment using the efficiency gain's freed compute to test a kernel size MedNeXt's own paper calls prohibitive, is now part of the plan (see proposal.md), and EffiDec3D (CVPR 2025, real code, pushed December 2025) is added as a third, genuinely recent baseline. The reviewer also correctly noted the proposal's stated device (an 8GB desktop GPU) cannot run real training and the plan did not say so plainly; this is now stated directly in proposal.md's Device Available section.
+
 ## Feasibility Audit: Survives with Named Limitations
 
 Based only on verified resource facts, not duration estimates.

@@ -28,16 +28,20 @@ Null-result framing, fixed in advance: a null or negative result on either effic
 
 ## 2. Proposed Technical Approach
 
-**Data source.** One task from the Medical Segmentation Decathlon, chosen for a bounded and tractable volume count, for example the liver or hippocampus task. Fully public, no registration or approval process, available through AWS Open Data, HuggingFace, or native download through MONAI.
+**Data source and processing.** One task from the Medical Segmentation Decathlon, chosen for a bounded and tractable volume count, for example the liver or hippocampus task. Fully public, no registration or approval process, available through AWS Open Data, HuggingFace, or native download through MONAI. Preprocessing, resampling, normalization, and patch-size and spacing selection use nnU-Net's own automatic planning pipeline, applied identically across every configuration below so that the only difference between runs is the factor under test, not a preprocessing inconsistency. The dataset's own predefined split is used for training and validation; no custom split is introduced.
 
 **Baselines, required by Option 1-C.**
 
-1. nnU-Net, run on the chosen task using its own standard, self-configuring setup.
-2. MedNeXt, run on the same task using its standard cuDNN-backed 3D convolution.
+1. nnU-Net, run on the chosen task using its own standard, self-configuring setup. Included as the field's standard reference framework, not a recency claim; its own paper predates the course's window.
+2. MedNeXt, run on the same task using its standard cuDNN-backed 3D convolution. The primary target for the kernel substitution below; also predates the strict recency window, included because it is the architecture being modified, not as the recency-satisfying source.
+3. EffiDec3D (CVPR 2025), run on the same task using its own released, official code. Genuinely recent (pushed December 2025) and directly relevant, an optimized decoder for 3D medical segmentation, satisfying Option 1-C's recency requirement independently of the first two. Its repository license is marked "Other" rather than a standard permissive license; the exact terms will be confirmed directly before any code from it is used, not assumed.
 
-**How the extension actually works.** Im2win's current implementation processes a 2D input by extracting overlapping rectangular windows so that memory reads stay contiguous, avoiding the memory blow-up of the standard im2col approach. Extending this to 3D means generalizing that windowing from two spatial axes to three: instead of a 2D window sliding over height and width, a 3D window must slide over height, width, and depth simultaneously, which changes both the memory layout the kernel expects and the indexing arithmetic inside it. The resulting kernel is wrapped as a PyTorch CUDA extension, following PyTorch's documented pattern for custom CUDA operators, and substituted for MedNeXt's `nn.Conv3d` layers.
+**How the extension actually works.** Im2win's current implementation processes a 2D input by extracting overlapping rectangular windows so that memory reads stay contiguous, avoiding the memory blow-up of the standard im2col approach. Extending this to 3D means generalizing that windowing from two spatial axes to three: instead of a 2D window sliding over height and width, a 3D window must slide over height, width, and depth simultaneously, which changes both the memory layout the kernel expects and the indexing arithmetic inside it. A real technical risk, not yet resolved, is that windowed convolution's memory savings come from bounded overlap redundancy, and that redundancy can compound multiplicatively per added spatial axis; it is not guaranteed that a direct 3D generalization keeps the same relative efficiency advantage over cuDNN that the 2D version reports. The resulting kernel is wrapped as a PyTorch CUDA extension, following PyTorch's documented pattern for custom CUDA operators, and substituted for MedNeXt's `nn.Conv3d` layers. If the week-one validation (Implementation step 1) finds the overlap cost erodes the efficiency advantage at MedNeXt's kernel sizes, that is reported as a real, valid negative result rather than hidden, and the fallback is to test a reduced-overlap windowing variant before concluding the technique does not generalize.
 
-**Evaluation as ablation.** The substitution is evaluated by changing exactly one factor, the convolution kernel implementation, while holding architecture, data, and training procedure fixed. This isolates the effect of the kernel change from every other variable, satisfying Option 1-D's efficiency improvement category.
+**Two improvement categories, required by Option 1-D.**
+
+1. Efficiency improvement: the kernel substitution itself, evaluated as an ablation changing exactly one factor, the convolution kernel implementation, while holding architecture, data, and training procedure fixed.
+2. Architectural change: MedNeXt's own paper states that scaling kernel size in 3D networks is "computationally prohibitive" past a certain point, which is why it uses compound scaling instead. With the faster kernel's freed compute and memory budget, this project also trains a MedNeXt variant with a larger kernel size than the original paper's reported 3 and 5, previously impractical at standard cost, and reports whether that change improves Dice. This turns the efficiency gain into an enabling condition for an architectural experiment, not just a speed measurement on its own.
 
 **Implementation plan.**
 
@@ -50,4 +54,4 @@ Null-result framing, fixed in advance: a null or negative result on either effic
 
 ## 3. Device Available and Maintainer
 
-Device available: NVIDIA RTX 5050 (desktop) (Uday Arora). Maintainer: Uday Arora; Claude Code access is requested to support implementation throughout the semester.
+Device available: NVIDIA RTX 5050 (desktop, 8GB) for code development only; full-resolution 3D medical segmentation training at the patch sizes nnU-Net and MedNeXt use is not expected to fit in 8GB, so all real training and benchmarking runs on a rented A100-class GPU (approximately $1.00 to $1.50 per hour), confirmed directly in week one rather than assumed. Maintainer: Uday Arora; Claude Code access is requested to support implementation throughout the semester.

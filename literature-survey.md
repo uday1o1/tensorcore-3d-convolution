@@ -34,9 +34,9 @@ Read at abstract level. Its core component, Johnson-Lindenstrauss lemma-guided c
 
 Read at abstract level. Pursues efficiency through sparse token representation rather than a convolution implementation change. Same pattern as source 4: efficiency addressed at a different level of the system than this project's contribution.
 
-### 6. Rahman and Marculescu. "EffiDec3D: An Optimized Decoder for High-Performance and Efficient 3D Medical Image Segmentation." CVPR 2025.
+### 6. Rahman and Marculescu. "EffiDec3D: An Optimized Decoder for High-Performance and Efficient 3D Medical Image Segmentation." CVPR 2025. Code: [github.com/SLDGroup/EffiDec3D](https://github.com/SLDGroup/EffiDec3D)
 
-Read at abstract level. Pursues efficiency through decoder redesign. Together with sources 4 and 5, this establishes that efficient 3D medical segmentation is a genuinely active 2025-2026 research area, with no surveyed source pursuing the specific angle of a memory-efficient, Tensor-Core-targeting convolution kernel.
+Read at abstract level. Pursues efficiency through decoder redesign, not the convolution kernel, keeping the differentiation from this project's angle intact. Its code is real, official, and recently pushed (December 2025), confirmed directly via the GitHub API, which makes it this project's third baseline: the genuinely recent, open-source entry that satisfies Option 1-C's recency requirement independently of nnU-Net and MedNeXt, both of which predate the course's strict window. Its repository license is marked "Other" rather than a named permissive license; the exact terms are confirmed directly before any of its code is used. Together with sources 4 and 5, this also establishes that efficient 3D medical segmentation is a genuinely active 2025-2026 research area, with no surveyed source pursuing the specific angle of a memory-efficient, Tensor-Core-targeting convolution kernel.
 
 ### 7. Antonelli et al. "The Medical Segmentation Decathlon." Nature Communications, 2022.
 
