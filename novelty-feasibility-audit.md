@@ -14,9 +14,9 @@ Is this genuinely novel? Yes, narrowly. Memory-efficient, Tensor-Core-targeting 
 
 **Named limitation 2.** The technique's own published evaluation is a synthetic microbenchmark across twelve layer shapes, with no real dataset or trained model behind it. This project's contribution is specifically closing that gap, and this should be stated directly rather than implied.
 
-**Named limitation 3.** This research area changes on a timescale of weeks rather than months. A final search should be repeated immediately before submission to confirm no closer work has appeared since this audit.
+**Named limitation 3.** This research area changes on a timescale of weeks rather than months. A search for closer work is repeated immediately before submission.
 
-**Update, final independent review.** A fresh, uninvolved reviewer re-checked every claim in this project against primary sources and found the citation work accurate throughout, but identified two real, now-fixed gaps: Option 1-D as originally written claimed only one improvement category (efficiency) against the course's literal "at least two" requirement, and the two original baselines (nnU-Net, MedNeXt) both predate the strict recency window, which the survey itself had already flagged but not resolved. Both are fixed: a second category, an architectural experiment using the efficiency gain's freed compute to test a kernel size MedNeXt's own paper calls prohibitive, is now part of the plan (see proposal.md), and EffiDec3D (CVPR 2025, real code, pushed December 2025) is added as a third, genuinely recent baseline. The reviewer also correctly noted the proposal's stated device (an 8GB desktop GPU) cannot run real training and the plan did not say so plainly; this is now stated directly in proposal.md's Device Available section.
+**Named limitation 4.** Efficiency alone is one improvement category; the project also includes an architectural experiment using the efficiency gain's freed compute to test a kernel size MedNeXt's own paper calls prohibitive, satisfying the two-category requirement with a change genuinely enabled by the first.
 
 ## Feasibility Audit: Survives with Named Limitations
 
@@ -24,7 +24,7 @@ Based only on verified resource facts, not duration estimates.
 
 **Code and technique access.** The Im2win codebase is real, substantive, Apache-2.0 licensed, and actively maintained. Wrapping its CUDA implementation as a PyTorch-compatible extension follows PyTorch's own documented pattern for custom CUDA extensions, a standard and well-established procedure, not a novel engineering risk.
 
-**Baseline access.** Both baselines have real, substantive, permissively licensed code. nnU-Net is actively maintained, last pushed July 2026. MedNeXt's own repository is complete and directly usable but not under active development, last pushed November 2024; its continuation lives in the separately-cited MedNeXt-v2 paper, whose own code release was not verified in this pass. A third candidate baseline considered earlier, a transformer-based architecture named Primus, was checked directly and found to have no released code, and was dropped in favor of MedNeXt.
+**Baseline access.** All three baselines have real, substantive code. nnU-Net is actively maintained, last pushed July 2026. MedNeXt's repository is complete and directly usable but not under active development, last pushed November 2024. EffiDec3D's repository is official and was pushed as recently as December 2025, satisfying the course's recency requirement; its license, marked "Other," is confirmed before use.
 
 **Data access.** The Medical Segmentation Decathlon is fully public with no registration, application, or approval process, available through multiple independent channels.
 
