@@ -28,4 +28,4 @@ Based only on verified resource facts, not duration estimates.
 
 **Compute access.** No GPU architecture compatibility risk is expected, since the technique's original evaluation and this project's target hardware are from the same generation family. Estimated total cost of $60 to $200 for the full training and benchmarking sweep on a rented GPU.
 
-**Named limitation.** MedNeXt uses larger convolution kernels than Im2win's original evaluation was designed around. This should be checked in the first week of implementation, before committing to full-scale training runs, to confirm the windowing scheme extends cleanly to those kernel sizes.
+**Named limitation.** Im2win has only ever been tested on 2D kernel shapes (up to size 11 in a single spatial dimension); MedNeXt uses 3D kernels at sizes 3 and 5 per axis. The open question is dimensionality and shape, not size, since the windowing scheme has never been exercised on a genuinely three-dimensional kernel at any size. This should be checked in the first week of implementation, before committing to full-scale training runs.
