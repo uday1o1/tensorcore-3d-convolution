@@ -2,7 +2,7 @@
 
 **Course:** CMPE 258, Deep Learning, Fall 2026, Prof. Kaikai Liu
 **Team:** Uday Arora
-**Track:** CMPE 258 has no track menu. This project targets Option 1, Modern Deep Learning Pipeline (Training and Deployment).
+**Option:** Option 1, Modern Deep Learning Pipeline (Training and Deployment)
 
 ## Abstract
 
