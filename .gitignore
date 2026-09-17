@@ -1,7 +1,6 @@
-# Local working directory (not evaluated by professor)
 _local_project_working/
 
-# Papers and cloned repos (shared, not part of this repo)
+# External references
 __pycache__/
 *.pyc
 .DS_Store
