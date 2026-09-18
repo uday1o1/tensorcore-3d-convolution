@@ -12,7 +12,7 @@ Read in full text. The full lineage of this technique from 2023 to 2024, prior t
 
 ### 1. "CUDA Kernel Optimization and Counter-Free Performance Analysis for Depthwise Convolution in Cloud Environments." [arXiv:2604.25422](https://arxiv.org/abs/2604.25422), April 2026
 
-Read at abstract level. Confirms that depthwise convolution, an adjacent variant to the one this project targets, already has dedicated recent CUDA kernel optimization work. This project does not target depthwise convolution; it targets three-dimensional convolution, which this source does not cover.
+Read at abstract level. Confirms depthwise convolution already has dedicated recent CUDA kernel optimization work of its own. MedNeXt's primary spatial convolution layer is depthwise by default; this project converts that layer to dense convolution rather than extending Im2win's windowing scheme to the depthwise case directly, since depthwise convolution's small per-channel multiplies do not present the large dense matmul shape Tensor Cores accelerate. This source's existing depthwise-specific work is one input to that decision, not a technique this project builds on directly.
 
 ### 2. Roy et al. "MedNeXt: Transformer-driven Scaling of ConvNets for Medical Image Segmentation." MICCAI 2023. [arXiv:2303.09975](https://arxiv.org/abs/2303.09975). Code: [github.com/MIC-DKFZ/MedNeXt](https://github.com/MIC-DKFZ/MedNeXt)
 
