@@ -101,6 +101,35 @@ def main():
         allok &= check(f"conv3d({ci},{co},k={k},p={p},s={s},g={g}) windowed={got.use_windowed}",
                        got(x), ref(x))
 
+    print("DispatchingConv3d vs nn.Conv3d, every policy (identical weights)")
+    # Every policy must return the SAME numbers; they differ only in which
+    # kernel computes them. A policy that silently never selects the windowed
+    # path would pass a correctness check while measuring cuDNN against
+    # itself, so the selected path is printed alongside the error.
+    from dispatch import DispatchingConv3d, prefer_windowed
+    for policy in ("cudnn", "windowed", "rule", "autotune"):
+        for ci, co, k, p, s, g in [(240, 240, 5, 2, 1, 1), (60, 60, 3, 1, 1, 1),
+                                   (64, 64, 5, 2, 1, 64)]:
+            ref = nn.Conv3d(ci, co, k, stride=s, padding=p, groups=g).cuda()
+            got = DispatchingConv3d(ci, co, k, stride=s, padding=p, groups=g,
+                                    policy=policy).cuda()
+            got.weight.data = ref.weight.data.clone()
+            got.bias.data = ref.bias.data.clone()
+            x = torch.randn(1, ci, 16, 16, 16, device="cuda")
+            out = got(x)
+            chose = list(got._choice.values())[0]
+            allok &= check(f"{policy:8s} conv3d({ci},{co},k={k},g={g}) "
+                           f"chose={'windowed' if chose else 'cudnn':8s}", out, ref(x))
+
+    # The rule must actually discriminate, or it is not a rule.
+    decisions = {prefer_windowed(C, sp, k)
+                 for C in (30, 240) for sp in (16, 64) for k in (3, 11)}
+    if len(decisions) < 2:
+        print("  FAIL prefer_windowed returns a constant, it is not deciding anything")
+        allok = False
+    else:
+        print("  OK   prefer_windowed discriminates across shapes")
+
     print()
     print("ALL CORRECT" if allok else "FAILURES PRESENT")
     return 0 if allok else 1
