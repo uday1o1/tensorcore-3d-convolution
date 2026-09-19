@@ -30,7 +30,7 @@ Null-result framing, fixed in advance: a null or negative result on either effic
 
 ## 2. Proposed Technical Approach
 
-**Data source and processing.** The Liver task (Task03) from the Medical Segmentation Decathlon: 104 training volumes and 27 validation volumes, chosen for a bounded and tractable volume count. Fully public, no registration or approval process, available through AWS Open Data. Preprocessing, resampling, normalization, and patch-size and spacing selection use nnU-Net's own automatic planning pipeline, applied identically across every configuration below so that the only difference between runs is the factor under test, not a preprocessing inconsistency. The dataset's own predefined split is used for training and validation; no custom split is introduced.
+**Data source and processing.** The Liver task (Task03) from the Medical Segmentation Decathlon: 131 labeled training volumes, plus 70 additional volumes with no public labels (reserved for the Decathlon's own held-out leaderboard, not usable for this project's own accuracy evaluation). Fully public, no registration or approval process, available through AWS Open Data. Preprocessing, resampling, normalization, and patch-size and spacing selection use MedNeXt's own custom nnU-Net-based planning pipeline, applied identically across every configuration below so that the only difference between runs is the factor under test, not a preprocessing inconsistency. Evaluation uses nnU-Net's standard 5-fold cross-validation over the 131 labeled volumes; no custom split is introduced.
 
 **Baselines, required by Option 1-C.**
 
