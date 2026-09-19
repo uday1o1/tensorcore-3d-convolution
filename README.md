@@ -40,7 +40,13 @@ convolution benchmark uses, in any of the 12 shapes measured. It wins in 11 of 1
 channels with kernel size 5 or above. Speedups reach 2.36x, and on the largest layer
 measured it saves 735 ms on a single convolution.
 
-The regime in which this method is evaluated is the regime in which it is worst.
+The regime in which this method is evaluated is the regime in which it is worst, in a
+second sense too. Every published number in this family times a forward pass. Measured
+over the same grid, the windowed method averages 0.940 of cuDNN on the forward pass and
+**1.030 on the backward pass**, with a full training step at 1.015. It wins on the pass
+nobody benchmarks and loses on the pass everybody does. The price is memory: peak
+training memory runs at a median of 2.16x cuDNN and up to 5.25x, because a buffer
+consumed by both passes must be retained between them.
 
 Neither pure strategy is good, which is why the artifact is a dispatcher rather than a
 replacement: always using cuDNN sits 13.2 percent off a per-shape oracle and always
@@ -72,6 +78,7 @@ CUDA GPU. Only the accuracy arm needs data we cannot redistribute.
 | `bench/verify_reported_numbers.py` | checks every derived number in the write-up against `results/` | nothing, no GPU or torch |
 | `bench/bench_crossover.py` | `results/crossover_map.json`, the crossover grid | GPU only |
 | `bench/bench_dispatch.py` | `results/dispatch_heldout.json`, held-out rule test | GPU only |
+| `bench/bench_training_crossover.py` | `results/training_crossover.json`, forward vs backward vs full step | GPU only |
 | `bench/bench_reproduce_im2win.py` | the 1.56x and 1.13x reproduction figures | GPU; the kernel-only number additionally needs Im2win built via `bench/CMakeLists.txt` |
 | `bench/bench_end_to_end.py` | whole network substitution cost | GPU + MedNeXt fork |
 | `bench/bench_dispatch_network.py` | dispatcher on real networks | GPU + MedNeXt fork |

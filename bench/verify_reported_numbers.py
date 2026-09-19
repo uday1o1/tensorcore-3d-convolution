@@ -50,6 +50,10 @@ CLAIMED = {
     "held out, geo gap always windowed": 1.098,
     "held out, geo gap shape rule": 1.041,
     "held out, rule agreements out of 32": 24,
+    "training, geo ratio forward": 0.940,
+    "training, geo ratio backward": 1.030,
+    "training, geo ratio full step": 1.015,
+    "training, peak memory median": 2.16,
 }
 
 
@@ -78,10 +82,16 @@ def main():
         print("regenerate with bench_crossover.py and bench_dispatch.py")
         return 1
 
+    tc = ROOT / "results" / "training_crossover.json"
     allrows = json.load(open(cm))
     dense = [r for r in allrows if r.get("mode", "dense") == "dense"]
     depth = [r for r in allrows if r.get("mode") == "depthwise"]
     held = json.load(open(ho))
+
+    train = json.load(open(tc)) if tc.exists() else []
+
+    def geo(vals):
+        return math.exp(sum(math.log(v) for v in vals) / len(vals))
 
     big = max(dense, key=lambda r: r["cudnn_ms"] - r["win_ms"])
     computed = {
@@ -104,6 +114,22 @@ def main():
         "held out, rule agreements out of 32":
             sum(r["rule_says_windowed"] == r["windowed_actually_faster"] for r in held),
     }
+    if train:
+        bwd = [(r["step_cudnn_ms"] - r["fwd_cudnn_ms"]) /
+               (r["step_win_ms"] - r["fwd_win_ms"]) for r in train
+               if r["step_cudnn_ms"] > r["fwd_cudnn_ms"]
+               and r["step_win_ms"] > r["fwd_win_ms"]]
+        computed.update({
+            "training, geo ratio forward": geo([r["fwd_ratio"] for r in train]),
+            "training, geo ratio backward": geo(bwd),
+            "training, geo ratio full step": geo([r["step_ratio"] for r in train]),
+            "training, peak memory median": st.median([r["mem_ratio"] for r in train]),
+        })
+    else:
+        for k in list(CLAIMED):
+            if k.startswith("training,"):
+                CLAIMED.pop(k)
+        print("note: results/training_crossover.json absent, skipping training claims\n")
 
     print(f"crossover grid: {len(dense)} dense, {len(depth)} depthwise, "
           f"{dense[0].get('trials','?')} trials each")
