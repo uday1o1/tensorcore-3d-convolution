@@ -25,6 +25,7 @@ Requires nnU-Net (via the MedNeXt fork) for the architecture.
 Usage:  python bench_dispatch_network.py [kernel_sizes...]   default: 3 5
 """
 import copy
+import json
 import sys
 from pathlib import Path
 import time
@@ -146,7 +147,11 @@ def run_one(k, patch):
         print(f"    {policy:9s} {c/results[policy][0]:5.3f}x")
     del ref, x
     torch.cuda.empty_cache()
-    return {p: results[p][0] for p in results}
+    out = {"k": k, "patch": patch, "eligible_layers": eligible}
+    for p, (dt, mem, chosen, rel) in results.items():
+        out[p] = {"ms": dt * 1000, "peak_gb": mem, "windowed_layers": chosen,
+                  "rel_err": rel, "speedup_vs_cudnn": c / dt}
+    return out
 
 
 def main(kernels):
@@ -164,9 +169,11 @@ def main(kernels):
             torch.cuda.empty_cache()
             print(f"  kernel size {k}: out of memory even at patch {p}")
 
+    json.dump(list(out.values()), open(ROOT / "results" / "dispatch_network.json", "w"), indent=1)
+
     print(f"\n{'='*66}\nVERDICT\n{'='*66}")
     for k, r in out.items():
-        rule_vs_cudnn = r["cudnn"] / r["rule"]
+        rule_vs_cudnn = r["rule"]["speedup_vs_cudnn"]
         if k <= 3:
             ok = rule_vs_cudnn > 0.97   # within 3 percent counts as no harm
             print(f"  k={k}: bar 1, do no harm. rule is {rule_vs_cudnn:.3f}x of "
@@ -176,7 +183,8 @@ def main(kernels):
             print(f"  k={k}: bar 2, win at large kernels. rule is "
                   f"{rule_vs_cudnn:.3f}x of cuDNN -> {'PASS' if ok else 'FAIL'}")
         print(f"        always-windowed would have been "
-              f"{r['cudnn']/r['windowed']:.3f}x, autotune {r['cudnn']/r['autotune']:.3f}x")
+              f"{r['windowed']['speedup_vs_cudnn']:.3f}x, "
+              f"autotune {r['autotune']['speedup_vs_cudnn']:.3f}x")
     return 0
 
 
