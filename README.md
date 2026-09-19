@@ -27,9 +27,11 @@ times the memory, at numerically identical accuracy.
 
 But the two algorithms scale differently in kernel size. Implicit GEMM scales with the
 `k^3` growth in work, while windowed materialization grows only linearly in `k`. The
-curves cross. Across a 60-configuration sweep the windowed method wins in 27, never at
-kernel size 3 and usually at kernel size 9 and above, reaching 1.73 times on the largest
-layers measured, where it saves 780 ms on a single convolution.
+curves cross. Across a 60-configuration sweep the windowed method wins in 27. Two rules
+hold across the whole grid: it never wins at kernel size 3, the size essentially every
+published convolution benchmark uses, and it always wins at 240 channels once the kernel
+reaches size 5. Speedups reach 2.36x, and on the largest layer measured it saves 780 ms
+on a single convolution.
 
 The regime in which this method is evaluated is the regime in which it is worst.
 

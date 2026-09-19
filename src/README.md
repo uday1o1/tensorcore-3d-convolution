@@ -73,7 +73,8 @@ layer = WindowedConv3d(60, 60, 3, padding=1).cuda()   # drop-in for nn.Conv3d
 
 ## When to use this
 
-At kernel size 3 the windowed method loses to cuDNN by a factor of two to
-three, and substituted into a whole network it is 2.34x slower on 3.9x the
-memory. At kernel sizes 9 and 11 in three dimensions it wins, by up to 1.7x
-on the largest layers measured. See `bench/bench_crossover.py` for the map.
+At kernel size 3 the windowed method loses to cuDNN in all 12 shapes measured,
+by a factor of two to three, and substituted into a whole network it is 2.34x
+slower on 3.9x the memory. At 240 channels with kernel size 5 or larger it wins
+in all 12 shapes measured, by up to 1.73x. Speedups across the whole grid reach
+2.36x. See `bench/bench_crossover.py` for the map and its trial spread.
