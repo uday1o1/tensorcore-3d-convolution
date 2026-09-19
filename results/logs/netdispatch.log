@@ -1,0 +1,37 @@
+
+==================================================================
+nnU-Net 3D, kernel size 3, patch 128^3
+==================================================================
+  cudnn         53.4 ms   peak  1.31 GB   windowed on  0/22 eligible layers   rel_err 0.00e+00
+  windowed     126.5 ms   peak  5.06 GB   windowed on 22/22 eligible layers   rel_err 1.51e-06
+  rule          54.2 ms   peak  1.31 GB   windowed on  0/22 eligible layers   rel_err 0.00e+00
+  autotune      56.9 ms   peak  1.31 GB   windowed on  3/22 eligible layers   rel_err 1.51e-06
+
+  speedup over cuDNN:
+    windowed  0.422x
+    rule      0.986x
+    autotune  0.939x
+
+(note: kernel size 5 uses patch 64^3, since 128^3 does not fit in 24GB at this kernel size)
+
+==================================================================
+nnU-Net 3D, kernel size 5, patch 64^3
+==================================================================
+  restored same padding on 22 convolutions (Generic_UNet only pads kernel size 3)
+  cudnn         20.2 ms   peak  1.45 GB   windowed on  0/22 eligible layers   rel_err 0.00e+00
+  windowed      34.2 ms   peak  1.99 GB   windowed on 22/22 eligible layers   rel_err 2.90e-06
+  rule          20.4 ms   peak  1.21 GB   windowed on 10/22 eligible layers   rel_err 1.27e-06
+  autotune      22.3 ms   peak  1.33 GB   windowed on  6/22 eligible layers   rel_err 2.90e-06
+
+  speedup over cuDNN:
+    windowed  0.591x
+    rule      0.994x
+    autotune  0.908x
+
+==================================================================
+VERDICT
+==================================================================
+  k=3: bar 1, do no harm. rule is 0.986x of cuDNN -> PASS
+        always-windowed would have been 0.422x, autotune 0.939x
+  k=5: bar 2, win at large kernels. rule is 0.994x of cuDNN -> FAIL
+        always-windowed would have been 0.591x, autotune 0.908x

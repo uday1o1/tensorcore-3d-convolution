@@ -1,0 +1,65 @@
+preflight: autotuner against shapes the grid already settled
+           shape    grid   truth  autotune  agree
+     C60 sp64 k3    0.63   False     False   True
+    C240 sp64 k5    1.45    True      True   True
+    C240 sp16 k3    0.84   False     False   True
+    C120 sp64 k9    1.28    True      True   True
+     C30 sp32 k5    0.62   False     False   True
+  autotuner trustworthy: True
+
+held-out grid: C=[48, 96, 192, 320] spatial=[24, 48] k=[3, 5, 7, 9] batch=2
+    C  sp  k  out  cuDNN_ms   win_ms  ratio   rule  correct
+   48  24  3   22      0.10     0.14   0.71  False     True
+   48  24  5   20      0.31     0.33   0.94  False     True
+   48  24  7   18      0.66     0.71   0.94  False     True
+   48  24  9   16      0.92     0.92   1.01   True     True
+   48  48  3   46      1.10     1.37   0.80  False     True
+   48  48  5   44      2.99     3.37   0.89  False     True
+   48  48  7   42      6.64     7.01   0.95  False     True
+   48  48  9   40     12.11    18.99   0.64   True    False
+   96  24  3   22      0.32     0.38   0.85  False     True
+   96  24  5   20      0.99     1.41   0.70  False     True
+   96  24  7   18      1.95     2.38   0.82  False     True
+   96  24  9   16      3.08     3.60   0.86   True    False
+   96  48  3   46      2.90     3.45   0.84  False     True
+   96  48  5   44     10.68    10.65   1.00  False    False
+   96  48  7   42     28.84    23.65   1.22  False    False
+   96  48  9   40     59.89    42.30   1.42   True     True
+  192  24  3   22      1.07     1.34   0.80  False     True
+  192  24  5   20      3.24     3.36   0.96  False     True
+  192  24  7   18      6.96     6.58   1.06  False    False
+  192  24  9   16     11.48    10.16   1.13   True     True
+  192  48  3   46      9.64    11.13   0.87  False     True
+  192  48  5   44     40.77    36.27   1.12  False    False
+  192  48  7   42     99.14    74.63   1.33  False    False
+  192  48  9   40    259.69   132.93   1.95   True     True
+  320  24  3   22      2.81     2.79   1.01  False    False
+  320  24  5   20     10.63     8.92   1.19   True     True
+  320  24  7   18     21.85    16.85   1.30   True     True
+  320  24  9   16     33.72    24.96   1.35   True     True
+  320  48  3   46     22.44    28.06   0.80  False     True
+  320  48  5   44    120.28    93.53   1.29   True     True
+  320  48  7   42    318.61   209.73   1.52   True     True
+  320  48  9   40    678.52   375.10   1.81   True     True
+
+held-out shapes: 32, windowed actually faster in 16
+rule agrees with ground truth in 24/32 (75.0%)
+
+policy comparison, lower gap is better:
+  cudnn      total    1774.3 ms   oracle-gap 1.557x   geo-gap 1.126x
+  windowed   total    1157.0 ms   oracle-gap 1.015x   geo-gap 1.098x
+  rule       total    1181.6 ms   oracle-gap 1.037x   geo-gap 1.041x
+  oracle     total    1139.5 ms   oracle-gap 1.000x   geo-gap 1.000x
+
+rule vs always-cuDNN:    1.083x better
+rule vs always-windowed: 1.055x better
+
+claim 'dispatch beats both pure strategies on unseen shapes': HOLDS
+
+8 disagreements:
+  C192 sp48 k 7: rule said cudnn   , ratio 1.33, cost +24.51 ms
+  C 48 sp48 k 9: rule said windowed, ratio 0.64, cost +6.88 ms
+  C 96 sp48 k 7: rule said cudnn   , ratio 1.22, cost +5.19 ms
+  C192 sp48 k 5: rule said cudnn   , ratio 1.12, cost +4.50 ms
+  C 96 sp24 k 9: rule said windowed, ratio 0.86, cost +0.52 ms
+  C192 sp24 k 7: rule said cudnn   , ratio 1.06, cost +0.38 ms

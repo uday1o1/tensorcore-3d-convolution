@@ -1,0 +1,40 @@
+
+(note: kernel size 7 uses patch 64^3, since 128^3 does not fit in 24GB at this kernel size)
+
+==================================================================
+nnU-Net 3D, kernel size 7, patch 64^3
+==================================================================
+  restored same padding on 22 convolutions (Generic_UNet only pads kernel size 3)
+  cudnn         53.0 ms   peak  3.70 GB   windowed on  0/22 eligible layers   rel_err 0.00e+00
+  windowed      80.9 ms   peak  4.15 GB   windowed on 22/22 eligible layers   rel_err 2.35e-06
+  rule          52.0 ms   peak  3.23 GB   windowed on 10/22 eligible layers   rel_err 4.44e-07
+  autotune      51.5 ms   peak  3.60 GB   windowed on  4/22 eligible layers   rel_err 2.35e-06
+
+  speedup over cuDNN:
+    windowed  0.655x
+    rule      1.019x
+    autotune  1.028x
+
+(note: kernel size 9 uses patch 64^3, since 128^3 does not fit in 24GB at this kernel size)
+
+==================================================================
+nnU-Net 3D, kernel size 9, patch 64^3
+==================================================================
+  restored same padding on 22 convolutions (Generic_UNet only pads kernel size 3)
+  cudnn        108.6 ms   peak  7.69 GB   windowed on  0/22 eligible layers   rel_err 0.00e+00
+  windowed     132.6 ms   peak  7.73 GB   windowed on 22/22 eligible layers   rel_err 4.18e-06
+  rule         132.6 ms   peak  7.73 GB   windowed on 22/22 eligible layers   rel_err 4.18e-06
+  autotune     105.9 ms   peak  7.70 GB   windowed on  5/22 eligible layers   rel_err 4.00e-06
+
+  speedup over cuDNN:
+    windowed  0.819x
+    rule      0.819x
+    autotune  1.025x
+
+==================================================================
+VERDICT
+==================================================================
+  k=7: bar 2, win at large kernels. rule is 1.019x of cuDNN -> PASS
+        always-windowed would have been 0.655x, autotune 1.028x
+  k=9: bar 2, win at large kernels. rule is 0.819x of cuDNN -> FAIL
+        always-windowed would have been 0.819x, autotune 1.025x
