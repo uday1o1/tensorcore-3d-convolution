@@ -56,7 +56,7 @@ CUDA GPU. Only the accuracy arm needs data we cannot redistribute.
 | `bench/verify_depthwise_indexing.py` | depthwise index validation in exact arithmetic | nothing, no GPU or torch |
 | `bench/bench_crossover.py` | `results/crossover_map.json`, the crossover grid | GPU only |
 | `bench/bench_dispatch.py` | `results/dispatch_heldout.json`, held-out rule test | GPU only |
-| `bench/bench_reproduce_im2win.py` | the 1.56x and 1.13x reproduction figures | GPU; the kernel-only number additionally needs Im2win built from `bench/sweep_convs.cpp` |
+| `bench/bench_reproduce_im2win.py` | the 1.56x and 1.13x reproduction figures | GPU; the kernel-only number additionally needs Im2win built via `bench/CMakeLists.txt` |
 | `bench/bench_end_to_end.py` | whole network substitution cost | GPU + MedNeXt fork |
 | `bench/bench_dispatch_network.py` | dispatcher on real networks | GPU + MedNeXt fork |
 | `bench/bench_dice_identical_weights.py` | `results/dice_identical_weights.json` | GPU + MedNeXt fork + preprocessed MSD Liver + a trained checkpoint |
