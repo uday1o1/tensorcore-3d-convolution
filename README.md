@@ -35,10 +35,19 @@ The regime in which this method is evaluated is the regime in which it is worst.
 
 ## Reproducing
 
+Measured on NVIDIA RTX 3090 (24GB), driver 595.71.05, CUDA 12.8, PyTorch
+2.11.0+cu128, sm_86. The GPU class matters: it is the same one used in Im2win's
+own published evaluation, which is what makes the reproduction comparable.
+cuDNN shows real run to run variance on this hardware, so all results are
+medians of repeated trials, taken against the cuDNN figure most favorable to
+cuDNN.
+
 ```bash
 cd bench
-python verify_correctness.py    # always run first; the failure mode being studied is silent
-python bench_crossover.py       # produces results/crossover_map.json
+python verify_correctness.py       # always run first, the failure mode studied here is silent
+python bench_reproduce_im2win.py   # 1.56x kernel only, 1.13x with full accounting
+python bench_crossover.py          # produces results/crossover_map.json
+python bench_end_to_end.py         # whole network substitution (needs nnU-Net + dataset)
 ```
 
 ## Foundation
