@@ -6,17 +6,24 @@
 
 ## Abstract
 
-Medical imaging volumes such as CT and MRI scans have real structure across all three spatial axes, which is why medical image segmentation is dominated by convolutional networks built on true three-dimensional convolutions rather than slice-by-slice two-dimensional processing. Im2win, a memory-efficient convolution technique with dedicated Tensor Core support, has been developed and refined across four papers from 2023 to 2026, reporting up to 2.8 times higher throughput than a standard CUDA implementation and 1.4 times higher than cuDNN at reduced memory, yet every version addresses only two-dimensional convolution, confirmed by a direct full-text search of all four papers. This leaves a real mismatch: the technique that reduces convolution's cost has not reached the dimensionality medical segmentation actually needs. MedNeXt, a current large-kernel 3D architecture, states directly that scaling kernel size in 3D networks quickly becomes computationally prohibitive, confirming that this specific cost is a live constraint in a current model, not a hypothetical one. This project extends Im2win to three dimensions, implements it as a PyTorch CUDA extension, and substitutes it for MedNeXt's standard 3D convolution layers, training on a Medical Segmentation Decathlon task and comparing against nnU-Net and unmodified MedNeXt. Success is defined as a statistically significant reduction in training and inference time and peak memory usage at non-inferior segmentation accuracy.
+Medical image segmentation is dominated by networks built on true three-dimensional convolution, and the cost of that convolution is a live constraint: MedNeXt, a current large-kernel 3D architecture, states directly that scaling kernel size in 3D quickly becomes computationally prohibitive. Im2win, a memory-efficient windowed convolution with Tensor Core support refined across four papers from 2023 to 2026, reports up to 1.4 times higher throughput than cuDNN at reduced memory, but every version addresses only two dimensions. This project set out to extend it to three dimensions and substitute it into a volumetric segmentation network, expecting a speedup.
+
+That expectation did not survive contact with measurement, and the investigation redirected accordingly. Two findings forced the change. First, the published comparison times the convolution kernel alone while the window materialization the method requires runs outside the timing loop, whereas cuDNN's implicit GEMM performs the equivalent work inside its timed kernel; implementing that materialization on the GPU and charging for it moves a reproduced 1.56 times advantage to 1.13. Second, the released kernels are specialized to individual benchmark layers through hardcoded launch geometry and return silently zero or partially computed output at any other problem shape, so there was no general implementation to port.
+
+We therefore built a shape-generic windowed convolution for two and three dimensions, verified against cuDNN on shapes the released kernels cannot execute, and used it to characterize when the approach pays off rather than to assert that it does. Substituted into a whole segmentation network at the standard kernel size of 3, it is 2.34 times slower on 3.9 times the memory, at numerically identical accuracy (voxel agreement 1.000000 across 27 validation cases on identical trained weights). Materialization volume relative to reduction depth governs the outcome, confirmed by three independent manipulations: dimensionality, materialization strategy, and kernel size.
+
+The same mechanism locates a regime the literature does not benchmark. Because implicit GEMM scales with the `k^3` growth in work while windowed materialization grows only linearly in `k`, the curves cross. Across a 60-configuration sweep the windowed method wins in 27, never at kernel size 3 and always at 240 channels once the kernel reaches size 5, saving up to 780 ms on a single convolution. The practical conclusion is not that one algorithm should replace the other but that the choice is shape-dependent and predictable, so the useful artifact is a dispatcher. The deliverables on file (`proposal.md`, `literature-survey.md`, `novelty-feasibility-audit.md`) describe the original framing; this README and `results/` describe what was measured.
 
 ## Repository Contents
 
 - `literature-survey.md`: SOTA survey (Deliverable B)
 - `proposal.md`: problem formulation, technical approach, device and maintainer (Deliverable C)
 - `novelty-feasibility-audit.md`: AI novelty and feasibility audit (Deliverable D)
-- `src/`: shape-generic windowed convolution for 2D and 3D, FFT convolution, and the
-  drop-in `nn.Conv3d` replacement. See `src/README.md`.
-- `bench/`: correctness verification and the benchmark that produces the crossover map.
-- `results/`: measured data behind the reported numbers.
+- `src/`: shape-generic windowed convolution for 2D and 3D, FFT convolution, the
+  drop-in `nn.Conv3d` replacement, and the shape-aware dispatcher. See `src/README.md`.
+- `bench/`: correctness verification and every benchmark behind the reported numbers.
+- `results/`: the measured data those benchmarks produced.
+- `requirements.txt`: pinned versions the measurements were taken with.
 
 ## Headline result
 
