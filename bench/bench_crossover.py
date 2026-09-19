@@ -19,8 +19,11 @@ are checked against.
 
 Usage:  python bench_crossover.py [trials]
 """
+import json
+import statistics as st
 import sys
-from pathlib import Path, json, time, statistics as st
+import time
+from pathlib import Path
 import torch
 import torch.nn.functional as F
 
