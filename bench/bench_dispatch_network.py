@@ -48,8 +48,17 @@ PATCH = 128
 
 
 def build(k):
-    """nnU-Net 3D, with every spatial convolution at kernel size k."""
-    pad = k // 2
+    """nnU-Net 3D, with every spatial convolution at kernel size k.
+
+    nnU-Net's Generic_UNet derives padding as `1 if kernel == 3 else 0`, so it
+    only supports kernel size 3 as a same-padded convolution. Asked for kernel
+    size 5 it builds unpadded convolutions, the volume loses 4 voxels per
+    convolution, and the encoder collapses to a 1 cubed feature map partway
+    down, at which point InstanceNorm raises. That is a limitation of the
+    architecture code rather than of the convolution, so we restore same
+    padding after construction, which is what any real large kernel network
+    would use.
+    """
     net = Generic_UNet(
         1, BASE_FEATURES, NUM_CLASSES, 5, 2, 2,
         nn.Conv3d, nn.InstanceNorm3d, {"eps": 1e-5, "affine": True},
@@ -58,6 +67,16 @@ def build(k):
         False, False, lambda x: x, None,
         [[2, 2, 2]] * 5, [[k, k, k]] * 6, False, True, True,
     ).cuda().eval()
+    fixed = 0
+    for m in net.modules():
+        if isinstance(m, nn.Conv3d) and m.kernel_size[0] > 1:
+            want = tuple(kk // 2 for kk in m.kernel_size)
+            if tuple(m.padding) != want:
+                m.padding = want
+                fixed += 1
+    if fixed:
+        print(f"  restored same padding on {fixed} convolutions "
+              f"(Generic_UNet only pads kernel size 3)")
     return net
 
 
@@ -98,6 +117,19 @@ def run_one(k, patch):
             rel = 0.0
         else:
             rel = (out - base).abs().max().item() / max(base.abs().max().item(), 1e-12)
+
+        # The exactness check above runs in fp32 with TF32 off, and the
+        # autotune policy decides on its first forward pass. Timing then runs
+        # under fp16 autocast. Left alone, autotune picks a path for one
+        # precision regime and is measured in another, and it showed up as
+        # autotune scoring 0.425x, identical to always-windowed and worse than
+        # the rule, which is impossible for a policy that is supposed to be an
+        # upper bound. Clear the cache and let it decide under autocast.
+        for m in model.modules():
+            if hasattr(m, "_choice"):
+                m._choice.clear()
+        with torch.no_grad(), torch.autocast("cuda", dtype=torch.float16):
+            model(x)
 
         dt, mem = measure(model, x)
         chosen = sum(1 for m in model.modules()
