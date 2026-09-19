@@ -57,7 +57,41 @@ def timeit(fn, n=8):
     return (time.time() - t0) / n
 
 
+def preflight():
+    """Check the autotuner reproduces decisions the grid already settled.
+
+    The autotuner is used as the oracle the rule is scored against, so it has
+    to be trustworthy before any of the held-out numbers mean anything. These
+    five shapes are in the measured grid, with known and unambiguous winners.
+    """
+    from dispatch import DispatchingConv3d
+    known = {(60, 64, 3): 0.63, (240, 64, 5): 1.45, (240, 16, 3): 0.84,
+             (120, 64, 9): 1.28, (30, 32, 5): 0.62}
+    print("preflight: autotuner against shapes the grid already settled")
+    hdr = ("shape", "grid", "truth", "autotune", "agree")
+    print(f"  {hdr[0]:>14}{hdr[1]:>8}{hdr[2]:>8}{hdr[3]:>10}{hdr[4]:>7}")
+    ok = True
+    for (C, sp, k), ratio in known.items():
+        m = DispatchingConv3d(C, C, k, policy="autotune").cuda().half()
+        x = torch.randn(BATCH, C, sp, sp, sp, device="cuda", dtype=torch.half)
+        m(x)
+        got = list(m._choice.values())[0]
+        truth = ratio > 1.0
+        ok &= got == truth
+        label = f"C{C} sp{sp} k{k}"
+        print(f"  {label:>14}{ratio:8.2f}{str(truth):>8}{str(got):>10}"
+              f"{str(got == truth):>7}")
+        del m, x
+        torch.cuda.empty_cache()
+    print(f"  autotuner trustworthy: {ok}\n")
+    return ok
+
+
 def main(trials=5):
+    if not preflight():
+        print("ABORT: the autotuner disagrees with already-measured shapes, so it "
+              "cannot serve as the oracle. Fix its timing before trusting anything below.")
+        return 1
     rows = []
     print(f"held-out grid: C={CHANNELS} spatial={SPATIAL} k={KERNELS} batch={BATCH}")
     print(f'{"C":>5}{"sp":>4}{"k":>3}{"out":>5}{"cuDNN_ms":>10}{"win_ms":>9}'
