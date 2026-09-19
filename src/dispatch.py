@@ -120,33 +120,53 @@ class DispatchingConv3d(nn.Module):
             return self._time_both(x)
         raise ValueError(f"unknown policy {self.policy!r}")
 
-    def _time_both(self, x, trials=3):
+    def _time_both(self, x, reps=5, iters=10, warmup=10):
         """Time both paths on the real input and return True if windowed wins.
 
-        Timed under no_grad on a clone, so autotuning never perturbs the
-        forward pass it is called from.
+        Timed under no_grad on a detached input, so autotuning never perturbs
+        the forward pass it is called from.
+
+        This is deliberately not a quick probe. It is the upper bound the rule
+        is measured against, so if it is noisy the whole comparison is
+        meaningless. Two specific hazards are handled:
+
+        - cuDNN's own algorithm autotuner (cudnn.benchmark) needs several
+          calls before it settles on an algorithm. Timing inside that window
+          measures the search, not the kernel.
+        - at small spatial extents the kernel is short enough that launch
+          overhead and host jitter dominate a single reading.
+
+        So each path gets a real warmup and the MEDIAN of several batches is
+        taken, matching the discipline used throughout this project after
+        single-shot readings produced three wrong headline numbers.
         """
         xd = x.detach()
         xp = F.pad(xd, (self.padding,) * 6) if self.padding > 0 else xd
+        w = self.weight.detach()
 
         def run_win():
-            _windowed(xp, self.weight.detach(), self.stride, self.depthwise)
+            _windowed(xp, w, self.stride, self.depthwise)
 
         def run_ref():
             self._cudnn(xd)
 
-        best = {}
+        med = {}
         with torch.no_grad():
             for name, fn in (("cudnn", run_ref), ("win", run_win)):
-                for _ in range(3):
+                for _ in range(warmup):
                     fn()
                 torch.cuda.synchronize()
-                t0 = time.time()
-                for _ in range(trials):
-                    fn()
-                torch.cuda.synchronize()
-                best[name] = (time.time() - t0) / trials
-        return best["win"] < best["cudnn"]
+                samples = []
+                for _ in range(reps):
+                    t0 = time.perf_counter()
+                    for _ in range(iters):
+                        fn()
+                    torch.cuda.synchronize()
+                    samples.append((time.perf_counter() - t0) / iters)
+                samples.sort()
+                med[name] = samples[len(samples) // 2]
+        self._last_timing = med
+        return med["win"] < med["cudnn"]
 
     def forward(self, x):
         key = tuple(x.shape)
