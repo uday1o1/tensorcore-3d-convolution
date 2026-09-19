@@ -12,30 +12,30 @@ from-scratch general implementation rather than an adaptation.
 
 ## Files
 
-**`winconv.py`** — windowed convolution.
+**`winconv.py`**: windowed convolution.
 
-- `im2win_conv2d(x, w, stride)` — materializes the H-axis overlap (expansion
+- `im2win_conv2d(x, w, stride)` materializes the H-axis overlap (expansion
   `k`, not `k^2`) and slides W inside the kernel. This mirrors the layout the
   released implementation produces, which is an H-unfold followed by a 1D
   convolution along W.
-- `im2win_conv3d(x, w, stride)` — unfolds D and H, slides W. Expansion `k^2`.
-- `im2win_conv3d_minmat(x, w, stride)` — unfolds D only, slides H and W.
+- `im2win_conv3d(x, w, stride)` unfolds D and H, slides W. Expansion `k^2`.
+- `im2win_conv3d_minmat(x, w, stride)` unfolds D only, slides H and W.
   Expansion `k`. This is the variant the paper's results use, since it matches
   the 2D method's materialization and makes the dimensional comparison
   like-for-like.
-- `WindowedConv3d` — drop-in replacement for `nn.Conv3d` supporting the
+- `WindowedConv3d` is a drop-in replacement for `nn.Conv3d` supporting the
   padding, stride, and bias configurations nnU-Net uses. Falls back to cuDNN
   for `kernel_size=1` and grouped convolution, which lie outside the windowed
   method's scope. No custom operator binding is needed because the
   implementation is expressed in PyTorch primitives.
 
-**`fftconv.py`** — `fft_conv3d(x, w)`, FFT-based 3D convolution, stride 1.
+**`fftconv.py`**: `fft_conv3d(x, w)`, FFT-based 3D convolution, stride 1.
 Included as the natural third algorithm, since its cost is independent of
 kernel size. Measured here it is not competitive at realistic channel widths:
 in frequency space the channel reduction becomes a dense complex multiply
 whose cost the kernel-size savings do not touch.
 
-**`dice_compare.py`** — runs both cuDNN and windowed configurations over the
+**`dice_compare.py`**: runs both cuDNN and windowed configurations over the
 validation set on identical trained weights, using an identical sliding-window
 procedure, and reports per-case Dice and voxel-level agreement. Because the
 weights are identical, any difference is the kernel's numerics alone, with no
