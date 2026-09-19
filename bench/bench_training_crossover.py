@@ -112,6 +112,19 @@ def main(trials=5):
                     t_ref = st.median([timeit(step_ref) for _ in range(trials)])
                     t_win = st.median([timeit(step_win) for _ in range(trials)])
 
+                    # The reuse that helps latency has a memory price: the
+                    # materialized buffer must be RETAINED for the backward
+                    # pass, where in inference it is freed immediately. Measure
+                    # it, since memory is half of what makes large kernel 3D
+                    # training prohibitive in the first place.
+                    mem = {}
+                    for name, go in (("cudnn", step_ref), ("win", step_win)):
+                        torch.cuda.empty_cache()
+                        torch.cuda.reset_peak_memory_stats()
+                        go()
+                        torch.cuda.synchronize()
+                        mem[name] = torch.cuda.max_memory_allocated() / 1e9
+
                     rf, rt = f_ref / f_win, t_ref / t_win
                     rows.append({"C": C, "sp": sp, "k": k, "batch": BATCH,
                                  "trials": trials,
@@ -119,9 +132,13 @@ def main(trials=5):
                                  "fwd_win_ms": f_win * 1000, "fwd_ratio": rf,
                                  "step_cudnn_ms": t_ref * 1000,
                                  "step_win_ms": t_win * 1000, "step_ratio": rt,
-                                 "shift": rt - rf})
+                                 "shift": rt - rf,
+                                 "step_mem_cudnn_gb": mem["cudnn"],
+                                 "step_mem_win_gb": mem["win"],
+                                 "mem_ratio": mem["win"] / max(mem["cudnn"], 1e-9)})
                     print(f"{C:5d}{sp:4d}{k:3d} | {f_ref*1000:8.2f}{rf:10.2f} | "
-                          f"{t_ref*1000:8.2f}{rt:10.2f} | {rt-rf:+6.2f}", flush=True)
+                          f"{t_ref*1000:8.2f}{rt:10.2f} | {rt-rf:+6.2f} | "
+                          f"mem x{mem['win']/max(mem['cudnn'],1e-9):5.2f}", flush=True)
                     del x, w
                     torch.cuda.empty_cache()
                 except (torch.cuda.OutOfMemoryError, RuntimeError) as e:
@@ -150,6 +167,11 @@ def main(trials=5):
 
     verdict = "CONFIRMED" if geo_t > geo_f else "REFUTED"
     print(f"\nprediction 'the crossover moves earlier in training': {verdict}")
+    mr = [r["mem_ratio"] for r in rows]
+    print(f"  peak training memory, windowed over cuDNN: median {st.median(mr):.2f}x, "
+          f"worst {max(mr):.2f}x")
+    print("  (the buffer that is reused across both passes must also be retained "
+          "across them)")
 
     # Where does the crossover sit in each regime?
     for label, key in (("forward only", "fwd_ratio"), ("training step", "step_ratio")):
