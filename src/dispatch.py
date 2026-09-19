@@ -38,9 +38,22 @@ def prefer_windowed(channels, spatial, kernel_size):
 
     Clause 1 excludes kernel size 3, where windowed lost in all 12 shapes
     measured. Clause 2 admits wide layers at kernel size 5 and above, where it
-    won in all 12. Clause 3 admits large kernels generally, which holds in 18
-    of 24 rather than unanimously, and is the clause to drop first if the rule
-    is ported to different hardware.
+    won in all 12.
+
+    Clause 3 admits large kernels generally and is the weak one: it holds in
+    18 of 24, not unanimously. The six exceptions are not scattered. Five sit
+    at low channel count (30) or at the single stubborn 120-channel, 32-cubed
+    family, always with spatial extent 32 or above, and every one of the four
+    shapes at spatial extent 16 wins. So the failure mode is narrow layers at
+    large spatial extent, which is the same low-intensity corner the rest of
+    the paper identifies.
+
+    We deliberately do NOT add a third clause to capture that. A guard on
+    output shrinkage was tried and improved nothing at any threshold, and
+    fitting another parameter to six data points would be overfitting to this
+    grid rather than learning the surface. Clause 3 is the one to drop first
+    when porting to different hardware, and bench_dispatch.py tests whether it
+    survives on shapes it was never derived from.
     """
     if kernel_size <= 3:
         return False
