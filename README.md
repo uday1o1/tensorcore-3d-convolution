@@ -12,7 +12,7 @@ That expectation did not survive contact with measurement, and the investigation
 
 We therefore built a shape-generic windowed convolution for two and three dimensions, verified against cuDNN on shapes the released kernels cannot execute, and used it to characterize when the approach pays off rather than to assert that it does. Substituted into a whole segmentation network at the standard kernel size of 3, it is 2.34 times slower on 3.9 times the memory, at numerically identical accuracy (voxel agreement 1.000000 across 27 validation cases on identical trained weights). Materialization volume relative to reduction depth governs the outcome, confirmed by three independent manipulations: dimensionality, materialization strategy, and kernel size.
 
-The same mechanism locates a regime the literature does not benchmark. Because implicit GEMM scales with the `k^3` growth in work while windowed materialization grows only linearly in `k`, the curves cross. Across a 60-configuration sweep the windowed method wins in 27, never at kernel size 3 and always at 240 channels once the kernel reaches size 5, saving up to 780 ms on a single convolution. The practical conclusion is not that one algorithm should replace the other but that the choice is shape-dependent and predictable, so the useful artifact is a dispatcher. The deliverables on file (`proposal.md`, `literature-survey.md`, `novelty-feasibility-audit.md`) describe the original framing; this README and `results/` describe what was measured.
+The same mechanism locates a regime the literature does not benchmark. Because implicit GEMM scales with the `k^3` growth in work while windowed materialization grows only linearly in `k`, the curves cross. Across a 60-configuration sweep at seven trials each, the windowed method wins in 26: never at kernel size 3 in any of the 12 shapes measured, and in 11 of 12 at 240 channels with kernel size 5 or above, saving up to 735 ms on a single convolution. The practical conclusion is not that one algorithm should replace the other but that the choice is shape-dependent and largely predictable, so the useful artifact is a dispatcher. A rule reading layer shape alone lands within 2.1 percent of a per-shape oracle, and 4.1 percent on a grid sharing no configuration with the one it came from, against 13.2 and 16.0 percent for the two pure strategies. It also has a failure mode we report rather than tune away. The deliverables on file (`proposal.md`, `literature-survey.md`, `novelty-feasibility-audit.md`) describe the original framing; this README and `results/` describe what was measured.
 
 ## Repository Contents
 
@@ -34,13 +34,21 @@ times the memory, at numerically identical accuracy.
 
 But the two algorithms scale differently in kernel size. Implicit GEMM scales with the
 `k^3` growth in work, while windowed materialization grows only linearly in `k`. The
-curves cross. Across a 60-configuration sweep the windowed method wins in 27. Two rules
-hold across the whole grid: it never wins at kernel size 3, the size essentially every
-published convolution benchmark uses, and it always wins at 240 channels once the kernel
-reaches size 5. Speedups reach 2.36x, and on the largest layer measured it saves 780 ms
-on a single convolution.
+curves cross. Across a 60-configuration sweep at seven trials each, the windowed method
+wins in 26. It never wins at kernel size 3, the size essentially every published
+convolution benchmark uses, in any of the 12 shapes measured. It wins in 11 of 12 at 240
+channels with kernel size 5 or above. Speedups reach 2.36x, and on the largest layer
+measured it saves 735 ms on a single convolution.
 
 The regime in which this method is evaluated is the regime in which it is worst.
+
+Neither pure strategy is good, which is why the artifact is a dispatcher rather than a
+replacement: always using cuDNN sits 13.2 percent off a per-shape oracle and always
+using the windowed method sits 16.0 percent off, while a rule reading only layer shape
+sits 2.1 percent off. Substituted into whole networks it does no harm at kernel size 3
+and wins at kernel size 7, both at lower peak memory than cuDNN, and it fails at kernel
+size 9 where a measurement-based autotuner does not. That failure is reported, not
+tuned away.
 
 ## Reproducing
 
@@ -78,8 +86,8 @@ the checkpoint is produced by training `src/trainers/nnUNetTrainerV2_150ep.py`.
 **Environment.** Measured on NVIDIA RTX 3090 (24GB), sm_86, CUDA 12.8, PyTorch
 2.11.0+cu128, Python 3.12.14, cuDNN 9.19.0. The GPU class matters: it is the
 same one used in Im2win's own published evaluation, which is what makes the
-reproduction comparable. Results in `results/` were produced across two RTX
-3090 hosts, on drivers 595.71.05 and 570.86.15.
+reproduction comparable. Every result currently in `results/` was measured on a
+single host, driver 595.71.05, so no number is compared across machines.
 
 cuDNN shows real run to run variance on this hardware, so all results are
 medians of repeated trials, taken against the cuDNN figure most favorable to
