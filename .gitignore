@@ -4,3 +4,8 @@ _local_project_working/
 __pycache__/
 *.pyc
 .DS_Store
+
+# large artifacts
+*.model
+*.npz
+*.npy

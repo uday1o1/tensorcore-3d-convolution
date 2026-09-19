@@ -1,0 +1,94 @@
+"""
+Correctness verification for every convolution implementation in src/.
+
+This exists because the failure mode observed in the published kernels this
+project reproduces is SILENT: they return zero or partially computed output
+with no error raised. An early benchmark sweep here reported 13,483 TFLOPS on
+one shape, roughly 190x the device peak, which is what timing an empty kernel
+launch measures. No timing in this project is reported for a configuration
+that has not first passed correctness.
+
+Note on TF32: PyTorch enables TF32 on Ampere by default, and its 10-bit
+mantissa produces relative errors near 3e-04 that look like algorithmic bugs
+but are not. Verification must disable it or it will misattribute precision
+to correctness.
+
+Usage:  python verify_correctness.py
+"""
+import sys
+import torch
+import torch.nn.functional as F
+
+sys.path.insert(0, "../src")
+from winconv import im2win_conv2d, im2win_conv3d, im2win_conv3d_minmat, WindowedConv3d
+from fftconv import fft_conv3d
+
+# true fp32 on both sides, otherwise TF32 masquerades as error
+torch.backends.cuda.matmul.allow_tf32 = False
+torch.backends.cudnn.allow_tf32 = False
+
+TOL = 1e-5
+
+
+def check(label, got, ref):
+    if got.shape != ref.shape:
+        print(f"  FAIL {label}: shape {tuple(got.shape)} vs {tuple(ref.shape)}")
+        return False
+    rel = (got - ref).abs().max().item() / max(ref.abs().max().item(), 1e-12)
+    ok = rel < TOL
+    print(f"  {'OK  ' if ok else 'FAIL'} {label}: rel_err {rel:.2e}")
+    return ok
+
+
+def main():
+    torch.manual_seed(0)
+    allok = True
+
+    print("2D windowed convolution")
+    for B, C, H, W, Co, k, s in [(2, 8, 16, 16, 4, 3, 1), (1, 3, 9, 9, 5, 3, 1),
+                                 (4, 16, 32, 32, 32, 3, 1), (2, 30, 24, 24, 60, 3, 1),
+                                 (2, 8, 16, 16, 4, 5, 1), (2, 8, 17, 19, 4, 3, 2)]:
+        x = torch.randn(B, C, H, W, device="cuda")
+        w = torch.randn(Co, C, k, k, device="cuda")
+        allok &= check(f"C{C} {H}x{W} Co{Co} k{k} s{s}",
+                       im2win_conv2d(x, w, stride=s), F.conv2d(x, w, stride=s))
+
+    print("3D windowed convolution, k^2 materialization")
+    for B, C, D, Co, k, s in [(2, 4, 8, 3, 3, 1), (2, 30, 16, 60, 3, 1), (2, 8, 10, 4, 3, 2)]:
+        x = torch.randn(B, C, D, D, D, device="cuda")
+        w = torch.randn(Co, C, k, k, k, device="cuda")
+        allok &= check(f"C{C} {D}^3 Co{Co} k{k} s{s}",
+                       im2win_conv3d(x, w, stride=s), F.conv3d(x, w, stride=s))
+
+    print("3D windowed convolution, minimal (k) materialization")
+    for B, C, D, Co, k, s in [(2, 4, 8, 3, 3, 1), (2, 30, 16, 60, 3, 1),
+                              (2, 16, 20, 32, 5, 1), (1, 6, 20, 4, 7, 1), (2, 8, 10, 4, 3, 2)]:
+        x = torch.randn(B, C, D, D, D, device="cuda")
+        w = torch.randn(Co, C, k, k, k, device="cuda")
+        allok &= check(f"C{C} {D}^3 Co{Co} k{k} s{s}",
+                       im2win_conv3d_minmat(x, w, stride=s), F.conv3d(x, w, stride=s))
+
+    print("FFT convolution")
+    for B, C, D, Co, k in [(1, 4, 12, 3, 3), (2, 8, 16, 6, 5), (1, 6, 14, 4, 7)]:
+        x = torch.randn(B, C, D, D, D, device="cuda")
+        w = torch.randn(Co, C, k, k, k, device="cuda")
+        allok &= check(f"C{C} {D}^3 Co{Co} k{k}", fft_conv3d(x, w), F.conv3d(x, w))
+
+    print("WindowedConv3d drop-in module vs nn.Conv3d (identical weights)")
+    import torch.nn as nn
+    for ci, co, k, p, s in [(30, 60, 3, 1, 1), (120, 120, 3, 1, 1), (60, 60, 3, 1, 2), (32, 64, 1, 0, 1)]:
+        ref = nn.Conv3d(ci, co, k, stride=s, padding=p).cuda()
+        got = WindowedConv3d(ci, co, k, stride=s, padding=p).cuda()
+        got.weight.data = ref.weight.data.clone()
+        got.bias.data = ref.bias.data.clone()
+        x = torch.randn(2, ci, 16, 16, 16, device="cuda")
+        allok &= check(f"conv3d({ci},{co},k={k},p={p},s={s}) windowed={got.use_windowed}",
+                       got(x), ref(x))
+
+    print()
+    print("ALL CORRECT" if allok else "FAILURES PRESENT")
+    return 0 if allok else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

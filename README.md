@@ -13,6 +13,33 @@ Medical imaging volumes such as CT and MRI scans have real structure across all 
 - `literature-survey.md`: SOTA survey (Deliverable B)
 - `proposal.md`: problem formulation, technical approach, device and maintainer (Deliverable C)
 - `novelty-feasibility-audit.md`: AI novelty and feasibility audit (Deliverable D)
+- `src/`: shape-generic windowed convolution for 2D and 3D, FFT convolution, and the
+  drop-in `nn.Conv3d` replacement. See `src/README.md`.
+- `bench/`: correctness verification and the benchmark that produces the crossover map.
+- `results/`: measured data behind the reported numbers.
+
+## Headline result
+
+Windowed convolution is usually presented as a faster alternative to cuDNN. Measured
+with complete accounting it is not, at the kernel sizes everyone benchmarks. It is
+2.34 times slower than cuDNN substituted into a whole 3D segmentation network, on 3.9
+times the memory, at numerically identical accuracy.
+
+But the two algorithms scale differently in kernel size. Implicit GEMM scales with the
+`k^3` growth in work, while windowed materialization grows only linearly in `k`. The
+curves cross. Across a 60-configuration sweep the windowed method wins in 27, never at
+kernel size 3 and usually at kernel size 9 and above, reaching 1.73 times on the largest
+layers measured, where it saves 780 ms on a single convolution.
+
+The regime in which this method is evaluated is the regime in which it is worst.
+
+## Reproducing
+
+```bash
+cd bench
+python verify_correctness.py    # always run first; the failure mode being studied is silent
+python bench_crossover.py       # produces results/crossover_map.json
+```
 
 ## Foundation
 

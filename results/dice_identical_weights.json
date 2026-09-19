@@ -1,0 +1,218 @@
+[
+ {
+  "case": "liver_101",
+  "cudnn_liver": 0.9673102408742128,
+  "cudnn_tumor": 0.8788734853234087,
+  "win_liver": 0.9673102408742128,
+  "win_tumor": 0.8788744465076418,
+  "voxel_agreement": 0.9999997615814209
+ },
+ {
+  "case": "liver_11",
+  "cudnn_liver": 0.9299583432968673,
+  "cudnn_tumor": 0.8149749658625398,
+  "win_liver": 0.929958298152099,
+  "win_tumor": 0.8149749658625398,
+  "voxel_agreement": 0.9999995231628418
+ },
+ {
+  "case": "liver_112",
+  "cudnn_liver": 0.9727145213320535,
+  "cudnn_tumor": 0.7075471698113207,
+  "win_liver": 0.9727126584445744,
+  "win_tumor": 0.7075471698113207,
+  "voxel_agreement": 0.9999999403953552
+ },
+ {
+  "case": "liver_115",
+  "cudnn_liver": 0.9722158935154767,
+  "cudnn_tumor": NaN,
+  "win_liver": 0.9722159302652024,
+  "win_tumor": NaN,
+  "voxel_agreement": 0.9999998211860657
+ },
+ {
+  "case": "liver_12",
+  "cudnn_liver": 0.9679454928226323,
+  "cudnn_tumor": 0.4589928057553957,
+  "win_liver": 0.9679447005362695,
+  "win_tumor": 0.4589928057553957,
+  "voxel_agreement": 0.9999996423721313
+ },
+ {
+  "case": "liver_120",
+  "cudnn_liver": 0.9578648108574923,
+  "cudnn_tumor": 0.6872066925117323,
+  "win_liver": 0.9578629197475999,
+  "win_tumor": 0.6872066925117323,
+  "voxel_agreement": 0.9999998211860657
+ },
+ {
+  "case": "liver_128",
+  "cudnn_liver": 0.9535929430994056,
+  "cudnn_tumor": 0.7836127807655805,
+  "win_liver": 0.9535910956293138,
+  "win_tumor": 0.7836037949635063,
+  "voxel_agreement": 0.9999998211860657
+ },
+ {
+  "case": "liver_17",
+  "cudnn_liver": 0.9069199412667095,
+  "cudnn_tumor": 0.8423625897011277,
+  "win_liver": 0.9069204735051553,
+  "win_tumor": 0.8423847326638978,
+  "voxel_agreement": 0.9999996423721313
+ },
+ {
+  "case": "liver_19",
+  "cudnn_liver": 0.9579975621219207,
+  "cudnn_tumor": 0.3260968505370472,
+  "win_liver": 0.9579955359937801,
+  "win_tumor": 0.3260968505370472,
+  "voxel_agreement": 0.9999995231628418
+ },
+ {
+  "case": "liver_24",
+  "cudnn_liver": 0.9610351695387014,
+  "cudnn_tumor": 0.7968337730870713,
+  "win_liver": 0.9610355367554332,
+  "win_tumor": 0.7968337730870713,
+  "voxel_agreement": 0.9999998211860657
+ },
+ {
+  "case": "liver_25",
+  "cudnn_liver": 0.9547595149847041,
+  "cudnn_tumor": 0.5329153605015674,
+  "win_liver": 0.9547602797883964,
+  "win_tumor": 0.5329153605015674,
+  "voxel_agreement": 0.9999997615814209
+ },
+ {
+  "case": "liver_27",
+  "cudnn_liver": 0.9482737421403648,
+  "cudnn_tumor": 0.797771018250723,
+  "win_liver": 0.9482728503057788,
+  "win_tumor": 0.7977660456389895,
+  "voxel_agreement": 0.9999998211860657
+ },
+ {
+  "case": "liver_3",
+  "cudnn_liver": 0.971408952913175,
+  "cudnn_tumor": 0.8539964476021314,
+  "win_liver": 0.97140770382105,
+  "win_tumor": 0.8539964476021314,
+  "voxel_agreement": 0.9999998807907104
+ },
+ {
+  "case": "liver_38",
+  "cudnn_liver": 0.9490676660042061,
+  "cudnn_tumor": NaN,
+  "win_liver": 0.9490696867967684,
+  "win_tumor": NaN,
+  "voxel_agreement": 0.9999995827674866
+ },
+ {
+  "case": "liver_40",
+  "cudnn_liver": 0.8973236033041225,
+  "cudnn_tumor": 0.7715814892745683,
+  "win_liver": 0.8973239839382514,
+  "win_tumor": 0.7715742253143225,
+  "voxel_agreement": 0.9999988675117493
+ },
+ {
+  "case": "liver_41",
+  "cudnn_liver": 0.9318001221451392,
+  "cudnn_tumor": 0.0,
+  "win_liver": 0.9317993670861671,
+  "win_tumor": 0.0,
+  "voxel_agreement": 0.9999990463256836
+ },
+ {
+  "case": "liver_42",
+  "cudnn_liver": 0.9536714378930709,
+  "cudnn_tumor": 0.5173745173745173,
+  "win_liver": 0.9536699426400205,
+  "win_tumor": 0.5175743530320587,
+  "voxel_agreement": 0.9999990463256836
+ },
+ {
+  "case": "liver_44",
+  "cudnn_liver": 0.9183104327946013,
+  "cudnn_tumor": 0.4811447664474859,
+  "win_liver": 0.9183091583535784,
+  "win_tumor": 0.48114285714285715,
+  "voxel_agreement": 0.9999988079071045
+ },
+ {
+  "case": "liver_5",
+  "cudnn_liver": 0.9680169541392502,
+  "cudnn_tumor": 0.7948717948717948,
+  "win_liver": 0.9680155480902163,
+  "win_tumor": 0.7948717948717948,
+  "voxel_agreement": 0.9999998807907104
+ },
+ {
+  "case": "liver_51",
+  "cudnn_liver": 0.8970711559616477,
+  "cudnn_tumor": 0.8466703324367655,
+  "win_liver": 0.8970712905159279,
+  "win_tumor": 0.8466679143596768,
+  "voxel_agreement": 1.0
+ },
+ {
+  "case": "liver_52",
+  "cudnn_liver": 0.94567808571157,
+  "cudnn_tumor": 0.8048780487804879,
+  "win_liver": 0.9456792012257607,
+  "win_tumor": 0.8048920313395758,
+  "voxel_agreement": 0.9999999403953552
+ },
+ {
+  "case": "liver_58",
+  "cudnn_liver": 0.941265718262376,
+  "cudnn_tumor": 0.5061267980820459,
+  "win_liver": 0.9412696415861697,
+  "win_tumor": 0.5061267980820459,
+  "voxel_agreement": 0.9999997615814209
+ },
+ {
+  "case": "liver_64",
+  "cudnn_liver": 0.9558345401805411,
+  "cudnn_tumor": 0.9433807079878932,
+  "win_liver": 0.9558345845440508,
+  "win_tumor": 0.9433762742453224,
+  "voxel_agreement": 0.9999995827674866
+ },
+ {
+  "case": "liver_70",
+  "cudnn_liver": 0.9467754533331901,
+  "cudnn_tumor": 0.8613816558390279,
+  "win_liver": 0.9467755622312372,
+  "win_tumor": 0.8613696668491766,
+  "voxel_agreement": 0.9999997615814209
+ },
+ {
+  "case": "liver_75",
+  "cudnn_liver": 0.9542243570808057,
+  "cudnn_tumor": 0.7878266215800799,
+  "win_liver": 0.954223444027238,
+  "win_tumor": 0.7878266215800799,
+  "voxel_agreement": 0.9999997019767761
+ },
+ {
+  "case": "liver_77",
+  "cudnn_liver": 0.9446969723397649,
+  "cudnn_tumor": 0.14708276797829037,
+  "win_liver": 0.9446953325860805,
+  "win_tumor": 0.14708276797829037,
+  "voxel_agreement": 0.9999995827674866
+ },
+ {
+  "case": "liver_82",
+  "cudnn_liver": 0.9527393071204316,
+  "cudnn_tumor": 0.8980681066532856,
+  "win_liver": 0.9527395987260951,
+  "win_tumor": 0.8980681066532856,
+  "voxel_agreement": 0.9999998211860657
+ }
+]
