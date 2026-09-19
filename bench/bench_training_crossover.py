@@ -173,6 +173,34 @@ def main(trials=5):
     print("  (the buffer that is reused across both passes must also be retained "
           "across them)")
 
+    # Back out the backward pass alone. This is the quantity no published
+    # comparison in this family reports, since they all time forward kernels.
+    #
+    # Caveat stated in the output: the forward baseline here is measured under
+    # no_grad, so subtracting it from the full step slightly overstates the
+    # backward by attributing graph construction and activation saving to it.
+    # The direction of that bias is the same for both algorithms.
+    bwd = []
+    for r in rows:
+        bc = r["step_cudnn_ms"] - r["fwd_cudnn_ms"]
+        bw = r["step_win_ms"] - r["fwd_win_ms"]
+        if bc > 0 and bw > 0:
+            bwd.append({"C": r["C"], "sp": r["sp"], "k": r["k"],
+                        "bwd_cudnn_ms": bc, "bwd_win_ms": bw, "bwd_ratio": bc / bw,
+                        "fwd_ratio": r["fwd_ratio"]})
+    if bwd:
+        br = [b["bwd_ratio"] for b in bwd]
+        fr = [b["fwd_ratio"] for b in bwd]
+        geo_b = math.exp(sum(math.log(v) for v in br) / len(br))
+        print(f"\nbackward pass alone, inferred as step minus forward "
+              f"({len(bwd)} configurations):")
+        print(f"  geometric mean ratio, backward   : {geo_b:.3f}")
+        print(f"  spread of forward ratios         : {min(fr):.2f} to {max(fr):.2f}")
+        print(f"  spread of backward ratios        : {min(br):.2f} to {max(br):.2f}")
+        print(f"  windowed wins on backward        : {sum(v > 1 for v in br)}/{len(br)}")
+        print("  (forward baseline is no_grad, so this slightly overstates the "
+              "backward for both algorithms)")
+
     # Where does the crossover sit in each regime?
     for label, key in (("forward only", "fwd_ratio"), ("training step", "step_ratio")):
         firsts = []
