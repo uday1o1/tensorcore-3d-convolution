@@ -48,11 +48,15 @@ kernel size. Measured here it is not competitive at realistic channel widths:
 in frequency space the channel reduction becomes a dense complex multiply
 whose cost the kernel-size savings do not touch.
 
-**`dice_compare.py`**: runs both cuDNN and windowed configurations over the
-validation set on identical trained weights, using an identical sliding-window
-procedure, and reports per-case Dice and voxel-level agreement. Because the
-weights are identical, any difference is the kernel's numerics alone, with no
-training variance to confound it.
+**`dispatch.py`**: `prefer_windowed(channels, spatial, kernel_size)` is the
+decision rule read off the crossover grid, and `DispatchingConv3d` is a drop-in
+`nn.Conv3d` that applies it per layer shape and caches the choice. Policies are
+`rule` (shape only, zero runtime cost), `autotune` (time both once per shape,
+the exact upper bound the rule is scored against), and the two pure baselines.
+`convert(model, policy)` swaps a whole network in place, preserving weights.
+
+The accuracy comparison on identical trained weights lives in
+`bench/bench_dice_identical_weights.py`, since it produces a measured result.
 
 ## Correctness
 

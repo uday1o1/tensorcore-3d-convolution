@@ -1,0 +1,21 @@
+# Core dependencies. Everything in bench/ except the dataset-dependent scripts
+# runs with just these plus a CUDA GPU.
+#
+# Install torch matching your CUDA version. The measurements in this repository
+# were taken with the cu128 build:
+#   pip install torch==2.11.0 --index-url https://download.pytorch.org/whl/cu128
+#
+torch==2.11.0
+numpy==2.5.3
+
+# Needed ONLY by the two benchmarks that use the real segmentation architecture
+# (bench_end_to_end.py, bench_dispatch_network.py) and by the accuracy check
+# (bench_dice_identical_weights.py). Install from source, since MedNeXt is a
+# fork of nnU-Net v1 and is not on PyPI:
+#
+#   git clone https://github.com/MIC-DKFZ/MedNeXt.git
+#   cd MedNeXt && pip install -e .
+#
+# Note: that fork ships a stale module reference. If you run its preprocessing,
+# experiment_planner_baseline_3DUNet.py hardcodes current_module="nnunet.preprocessing"
+# from before the fork rename and must be changed to "nnunet_mednext.preprocessing".

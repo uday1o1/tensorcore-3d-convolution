@@ -37,20 +37,46 @@ The regime in which this method is evaluated is the regime in which it is worst.
 
 ## Reproducing
 
-Measured on NVIDIA RTX 3090 (24GB), driver 595.71.05, CUDA 12.8, PyTorch
-2.11.0+cu128, sm_86. The GPU class matters: it is the same one used in Im2win's
-own published evaluation, which is what makes the reproduction comparable.
+```bash
+git clone https://github.com/uday1o1/tensorcore-3d-convolution.git
+cd tensorcore-3d-convolution
+pip install -r requirements.txt
+python bench/verify_correctness.py     # run this first
+python bench/bench_crossover.py        # the central result
+```
+
+Scripts resolve their own paths, so they run from any working directory.
+
+**What each result needs.** Most of the work reproduces from the clone plus a
+CUDA GPU. Only the accuracy arm needs data we cannot redistribute.
+
+| Script | Produces | Needs |
+|---|---|---|
+| `bench/verify_correctness.py` | correctness of every implementation | GPU only |
+| `bench/verify_depthwise_indexing.py` | depthwise index validation in exact arithmetic | nothing, no GPU or torch |
+| `bench/bench_crossover.py` | `results/crossover_map.json`, the crossover grid | GPU only |
+| `bench/bench_dispatch.py` | `results/dispatch_heldout.json`, held-out rule test | GPU only |
+| `bench/bench_reproduce_im2win.py` | the 1.56x and 1.13x reproduction figures | GPU; the kernel-only number additionally needs Im2win built from `bench/sweep_convs.cpp` |
+| `bench/bench_end_to_end.py` | whole network substitution cost | GPU + MedNeXt fork |
+| `bench/bench_dispatch_network.py` | dispatcher on real networks | GPU + MedNeXt fork |
+| `bench/bench_dice_identical_weights.py` | `results/dice_identical_weights.json` | GPU + MedNeXt fork + preprocessed MSD Liver + a trained checkpoint |
+
+The last one takes `--preprocessed` and `--checkpoint`, or reads nnU-Net's own
+`$nnUNet_preprocessed` and `$RESULTS_FOLDER`. It reports exactly what is
+missing and exits rather than failing obscurely. The dataset is Medical
+Segmentation Decathlon Task03 Liver, obtained from its own distributors, and
+the checkpoint is produced by training `src/trainers/nnUNetTrainerV2_150ep.py`.
+
+**Environment.** Measured on NVIDIA RTX 3090 (24GB), sm_86, CUDA 12.8, PyTorch
+2.11.0+cu128, Python 3.12.14, cuDNN 9.19.0. The GPU class matters: it is the
+same one used in Im2win's own published evaluation, which is what makes the
+reproduction comparable. Results in `results/` were produced across two RTX
+3090 hosts, on drivers 595.71.05 and 570.86.15.
+
 cuDNN shows real run to run variance on this hardware, so all results are
 medians of repeated trials, taken against the cuDNN figure most favorable to
-cuDNN.
-
-```bash
-cd bench
-python verify_correctness.py       # always run first, the failure mode studied here is silent
-python bench_reproduce_im2win.py   # 1.56x kernel only, 1.13x with full accounting
-python bench_crossover.py          # produces results/crossover_map.json
-python bench_end_to_end.py         # whole network substitution (needs nnU-Net + dataset)
-```
+cuDNN. Absolute timings will differ on other hardware; the ratios and the
+crossover structure are the claims.
 
 ## Foundation
 

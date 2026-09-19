@@ -19,11 +19,15 @@ are checked against.
 
 Usage:  python bench_crossover.py [trials]
 """
-import sys, json, time, statistics as st
+import sys
+from pathlib import Path, json, time, statistics as st
 import torch
 import torch.nn.functional as F
 
-sys.path.insert(0, "../src")
+# Resolve paths from this file, not the working directory, so the script
+# runs from anywhere in a fresh clone.
+ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT / "src"))
 from winconv import im2win_conv3d_minmat, im2win_conv3d_depthwise
 
 torch.backends.cudnn.benchmark = True
@@ -90,7 +94,7 @@ def main(trials=3):
     rows = []
     sweep("dense", trials, rows)
     sweep("depthwise", trials, rows)
-    json.dump(rows, open("../results/crossover_map.json", "w"), indent=1)
+    json.dump(rows, open(ROOT / "results" / "crossover_map.json", "w"), indent=1)
 
     for mode in ("dense", "depthwise"):
         sel = [r for r in rows if r["mode"] == mode]

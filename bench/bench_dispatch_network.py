@@ -26,12 +26,16 @@ Usage:  python bench_dispatch_network.py [kernel_sizes...]   default: 3 5
 """
 import copy
 import sys
+from pathlib import Path
 import time
 
 import torch
 import torch.nn as nn
 
-sys.path.insert(0, "../src")
+# Resolve paths from this file, not the working directory, so the script
+# runs from anywhere in a fresh clone.
+ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT / "src"))
 from dispatch import convert
 
 from nnunet_mednext.network_architecture.generic_UNet import Generic_UNet

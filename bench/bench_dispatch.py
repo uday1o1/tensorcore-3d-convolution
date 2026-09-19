@@ -27,12 +27,16 @@ import json
 import math
 import statistics as st
 import sys
+from pathlib import Path
 import time
 
 import torch
 import torch.nn.functional as F
 
-sys.path.insert(0, "../src")
+# Resolve paths from this file, not the working directory, so the script
+# runs from anywhere in a fresh clone.
+ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT / "src"))
 from winconv import im2win_conv3d_minmat
 from dispatch import prefer_windowed
 
@@ -130,7 +134,7 @@ def main(trials=5):
     if not rows:
         print("no configurations measured")
         return 1
-    json.dump(rows, open("../results/dispatch_heldout.json", "w"), indent=1)
+    json.dump(rows, open(ROOT / "results" / "dispatch_heldout.json", "w"), indent=1)
 
     oracle = sum(min(r["cudnn_ms"], r["win_ms"]) for r in rows)
 

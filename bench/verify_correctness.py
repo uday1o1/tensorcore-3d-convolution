@@ -16,10 +16,14 @@ to correctness.
 Usage:  python verify_correctness.py
 """
 import sys
+from pathlib import Path
 import torch
 import torch.nn.functional as F
 
-sys.path.insert(0, "../src")
+# Resolve paths from this file, not the working directory, so the script
+# runs from anywhere in a fresh clone.
+ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT / "src"))
 from winconv import (im2win_conv2d, im2win_conv3d, im2win_conv3d_minmat,
                      im2win_conv3d_depthwise, WindowedConv3d)
 from fftconv import fft_conv3d
