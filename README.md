@@ -61,6 +61,7 @@ CUDA GPU. Only the accuracy arm needs data we cannot redistribute.
 |---|---|---|
 | `bench/verify_correctness.py` | correctness of every implementation | GPU only |
 | `bench/verify_depthwise_indexing.py` | depthwise index validation in exact arithmetic | nothing, no GPU or torch |
+| `bench/verify_reported_numbers.py` | checks every derived number in the write-up against `results/` | nothing, no GPU or torch |
 | `bench/bench_crossover.py` | `results/crossover_map.json`, the crossover grid | GPU only |
 | `bench/bench_dispatch.py` | `results/dispatch_heldout.json`, held-out rule test | GPU only |
 | `bench/bench_reproduce_im2win.py` | the 1.56x and 1.13x reproduction figures | GPU; the kernel-only number additionally needs Im2win built via `bench/CMakeLists.txt` |
