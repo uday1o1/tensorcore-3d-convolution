@@ -24,7 +24,7 @@ import torch
 import torch.nn.functional as F
 
 sys.path.insert(0, "../src")
-from winconv import im2win_conv3d_minmat
+from winconv import im2win_conv3d_minmat, im2win_conv3d_depthwise
 
 torch.backends.cudnn.benchmark = True
 
@@ -45,9 +45,11 @@ def timeit(fn, n=8):
     return (time.time() - t0) / n
 
 
-def main(trials=3):
-    rows = []
-    print(f'{"C":>5}{"sp":>5}{"k":>4}{"out":>5}{"cuDNN_ms":>10}{"win_ms":>9}{"ratio":>8}')
+def sweep(mode, trials, rows):
+    """mode is 'dense' (groups=1) or 'depthwise' (groups=C)."""
+    print(f'\n=== {mode} ===')
+    print(f'{"C":>5}{"sp":>5}{"k":>4}{"out":>5}{"cuDNN_ms":>10}{"win_ms":>9}'
+          f'{"ratio":>8}  spread')
     for C in CHANNELS:
         for sp in SPATIAL:
             for k in KERNELS:
@@ -56,16 +58,21 @@ def main(trials=3):
                     continue
                 try:
                     x = torch.randn(BATCH, C, sp, sp, sp, device="cuda", dtype=torch.half)
-                    w = torch.randn(C, C, k, k, k, device="cuda", dtype=torch.half)
+                    if mode == "dense":
+                        w = torch.randn(C, C, k, k, k, device="cuda", dtype=torch.half)
+                        ref = lambda: F.conv3d(x, w)
+                        win = lambda: im2win_conv3d_minmat(x, w)
+                    else:
+                        w = torch.randn(C, 1, k, k, k, device="cuda", dtype=torch.half)
+                        ref = lambda: F.conv3d(x, w, groups=C)
+                        win = lambda: im2win_conv3d_depthwise(x, w)
                     pairs = []
                     for _ in range(trials):
-                        tc = timeit(lambda: F.conv3d(x, w))
-                        tw = timeit(lambda: im2win_conv3d_minmat(x, w))
-                        pairs.append((tc, tw))
+                        pairs.append((timeit(ref), timeit(win)))
                     ratios = [a / b for a, b in pairs]
                     tc = st.median([a for a, _ in pairs])
                     tw = st.median([b for _, b in pairs])
-                    rows.append({"C": C, "sp": sp, "k": k, "out": out,
+                    rows.append({"mode": mode, "C": C, "sp": sp, "k": k, "out": out,
                                  "batch": BATCH, "trials": trials,
                                  "cudnn_ms": tc * 1000, "win_ms": tw * 1000,
                                  "ratio": tc / tw,
@@ -77,18 +84,31 @@ def main(trials=3):
                 except (torch.cuda.OutOfMemoryError, RuntimeError):
                     torch.cuda.empty_cache()
                     print(f"{C:5d}{sp:5d}{k:4d}{out:5d}       oom", flush=True)
-    json.dump(rows, open("../results/crossover_map.json", "w"), indent=1)
-    wins = [r for r in rows if r["ratio"] > 1.0]
-    print(f"\nwindowed wins in {len(wins)}/{len(rows)} configurations")
-    if wins:
-        best = max(wins, key=lambda r: r["ratio"])
-        print(f"best: C={best['C']} sp={best['sp']} k={best['k']} -> {best['ratio']:.2f}x")
 
-    # The two rules the paper states as holding without exception, checked
-    # against the WORST trial in each cell rather than the median.
-    for label, sel in (("never wins at k=3", [r for r in rows if r["k"] == 3]),
+
+def main(trials=3):
+    rows = []
+    sweep("dense", trials, rows)
+    sweep("depthwise", trials, rows)
+    json.dump(rows, open("../results/crossover_map.json", "w"), indent=1)
+
+    for mode in ("dense", "depthwise"):
+        sel = [r for r in rows if r["mode"] == mode]
+        if not sel:
+            continue
+        wins = [r for r in sel if r["ratio"] > 1.0]
+        print(f"\n{mode}: windowed wins in {len(wins)}/{len(sel)} configurations")
+        if wins:
+            best = max(wins, key=lambda r: r["ratio"])
+            print(f"  best: C={best['C']} sp={best['sp']} k={best['k']} "
+                  f"-> {best['ratio']:.2f}x")
+
+    # The two rules the paper states as holding in every configuration
+    # measured, checked against the WORST trial in each cell, not the median.
+    dense = [r for r in rows if r["mode"] == "dense"]
+    for label, sel in (("never wins at k=3", [r for r in dense if r["k"] == 3]),
                        ("always wins at C>=240, k>=5",
-                        [r for r in rows if r["C"] >= 240 and r["k"] >= 5])):
+                        [r for r in dense if r["C"] >= 240 and r["k"] >= 5])):
         if not sel:
             continue
         if "never" in label:

@@ -23,11 +23,24 @@ from-scratch general implementation rather than an adaptation.
   Expansion `k`. This is the variant the paper's results use, since it matches
   the 2D method's materialization and makes the dimensional comparison
   like-for-like.
+- `im2win_conv3d_depthwise(x, w, stride)` is the same minimal materialization
+  for depthwise convolution (`groups == channels`), which is the layer type
+  large-kernel 3D architectures actually use. It exists so the method can be
+  measured on that layer type rather than assumed about. Depthwise reduces over
+  one input channel instead of `C`, so materialization is unchanged while the
+  compute it feeds drops by a factor of `C`, which the intensity account
+  predicts is the worst case for any materializing method.
 - `WindowedConv3d` is a drop-in replacement for `nn.Conv3d` supporting the
-  padding, stride, and bias configurations nnU-Net uses. Falls back to cuDNN
-  for `kernel_size=1` and grouped convolution, which lie outside the windowed
-  method's scope. No custom operator binding is needed because the
-  implementation is expressed in PyTorch primitives.
+  padding, stride, and bias configurations nnU-Net uses. Serves dense and fully
+  depthwise convolution; falls back to cuDNN for `kernel_size=1` and partially
+  grouped convolution (`1 < groups < C`). No custom operator binding is needed
+  because the implementation is expressed in PyTorch primitives.
+
+The channel grouping in both 3D paths depends on the unfold ordering the
+materialized axis as `(c, kd)` rather than `(kd, c)`. Getting this backwards is
+silently wrong, not an error, and it has already happened once in this project.
+`bench/verify_correctness.py` covers it on GPU; the ordering is additionally
+validated against a naive reference in exact arithmetic.
 
 **`fftconv.py`**: `fft_conv3d(x, w)`, FFT-based 3D convolution, stride 1.
 Included as the natural third algorithm, since its cost is independent of

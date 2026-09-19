@@ -20,7 +20,8 @@ import torch
 import torch.nn.functional as F
 
 sys.path.insert(0, "../src")
-from winconv import im2win_conv2d, im2win_conv3d, im2win_conv3d_minmat, WindowedConv3d
+from winconv import (im2win_conv2d, im2win_conv3d, im2win_conv3d_minmat,
+                     im2win_conv3d_depthwise, WindowedConv3d)
 from fftconv import fft_conv3d
 
 # true fp32 on both sides, otherwise TF32 masquerades as error
@@ -68,6 +69,18 @@ def main():
         allok &= check(f"C{C} {D}^3 Co{Co} k{k} s{s}",
                        im2win_conv3d_minmat(x, w, stride=s), F.conv3d(x, w, stride=s))
 
+    print("3D windowed convolution, depthwise")
+    # the layer type large-kernel 3D architectures actually use; the grouping
+    # here is easy to get silently wrong, since it depends on the unfold
+    # ordering the materialized channel axis as (c, kd) rather than (kd, c)
+    for B, C, D, k, s in [(2, 8, 12, 3, 1), (2, 32, 16, 5, 1),
+                          (1, 64, 20, 7, 1), (2, 16, 17, 3, 2)]:
+        x = torch.randn(B, C, D, D, D, device="cuda")
+        w = torch.randn(C, 1, k, k, k, device="cuda")
+        allok &= check(f"C{C} {D}^3 k{k} s{s} groups={C}",
+                       im2win_conv3d_depthwise(x, w, stride=s),
+                       F.conv3d(x, w, stride=s, groups=C))
+
     print("FFT convolution")
     for B, C, D, Co, k in [(1, 4, 12, 3, 3), (2, 8, 16, 6, 5), (1, 6, 14, 4, 7)]:
         x = torch.randn(B, C, D, D, D, device="cuda")
@@ -76,13 +89,16 @@ def main():
 
     print("WindowedConv3d drop-in module vs nn.Conv3d (identical weights)")
     import torch.nn as nn
-    for ci, co, k, p, s in [(30, 60, 3, 1, 1), (120, 120, 3, 1, 1), (60, 60, 3, 1, 2), (32, 64, 1, 0, 1)]:
-        ref = nn.Conv3d(ci, co, k, stride=s, padding=p).cuda()
-        got = WindowedConv3d(ci, co, k, stride=s, padding=p).cuda()
+    for ci, co, k, p, s, g in [(30, 60, 3, 1, 1, 1), (120, 120, 3, 1, 1, 1),
+                               (60, 60, 3, 1, 2, 1), (32, 64, 1, 0, 1, 1),
+                               (64, 64, 5, 2, 1, 64),   # depthwise, windowed
+                               (64, 64, 3, 1, 1, 4)]:   # partial groups, falls back
+        ref = nn.Conv3d(ci, co, k, stride=s, padding=p, groups=g).cuda()
+        got = WindowedConv3d(ci, co, k, stride=s, padding=p, groups=g).cuda()
         got.weight.data = ref.weight.data.clone()
         got.bias.data = ref.bias.data.clone()
         x = torch.randn(2, ci, 16, 16, 16, device="cuda")
-        allok &= check(f"conv3d({ci},{co},k={k},p={p},s={s}) windowed={got.use_windowed}",
+        allok &= check(f"conv3d({ci},{co},k={k},p={p},s={s},g={g}) windowed={got.use_windowed}",
                        got(x), ref(x))
 
     print()
