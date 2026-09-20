@@ -15,5 +15,24 @@ The two `netdispatch` runs predate the change that made
 live here rather than in a JSON file. Re-running either command now produces
 that JSON.
 
-Measured on NVIDIA RTX 3090 (24GB), sm_86, driver 595.71.05, CUDA 12.8,
-PyTorch 2.11.0+cu128, Python 3.12.14, cuDNN 9.19.0.
+| `cross4090.log` | `../crossover_map_rtx4090.json` | `python bench/bench_crossover.py 7` |
+| `train4090.log` | `../training_crossover_rtx4090.json` | `python bench/bench_training_crossover.py 5` |
+| `disp4090.log` | `../dispatch_heldout_rtx4090.json` | `python bench/bench_dispatch.py 5` |
+
+Two devices, with PyTorch and cuDNN pinned to the same versions on both so
+that cross-device differences are silicon rather than library version:
+
+- RTX 3090, sm_86, driver 595.71.05
+- RTX 4090, sm_89, 128 SMs, driver 570.144
+
+Both on CUDA 12.8, PyTorch 2.11.0+cu128, Python 3.12, cuDNN 9.19.0.
+
+The 4090's host shipped PyTorch 2.8.0 with cuDNN 9.10.2. Comparing against
+that would have confounded hardware with library version, since cuDNN's
+version determines which algorithms it can select, so the 4090 runs used an
+isolated environment pinned to match the 3090 exactly.
+
+`disp4090.log` was produced before the preflight was made device-aware, so its
+preflight table validates against RTX 3090 reference values. That affects only
+the gate, not the measurement: the held-out comparison times both algorithms
+directly and does not use the autotuner.
