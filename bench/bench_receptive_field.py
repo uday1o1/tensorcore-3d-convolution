@@ -132,19 +132,60 @@ def measure(model, x, train=False, reps=10, warmup=3):
     return (time.time() - t0) / reps, torch.cuda.max_memory_allocated() / 1e9
 
 
-def build(kernels):
-    """MedNeXt-B with per-stage depthwise kernel sizes.
+def set_stage_kernels(model, kernels):
+    """Give each encoder stage its own depthwise kernel size.
 
-    MedNeXt's own trainers expose a single kernel size for the whole network.
-    Per-stage placement is the question under review, so the kernel size is set
-    per stage after construction, on the depthwise convolution of each block,
-    leaving the expansion and compression 1x1x1 convolutions untouched.
+    MedNeXt exposes one kernel size for the whole network, but per-stage
+    placement is the question under review, so the depthwise convolutions are
+    replaced after construction. A Conv3d's kernel size cannot be reassigned in
+    place because the weight tensor shape is fixed, so each is swapped for a
+    new one with matching channels, groups and stride, and same padding.
+
+    Stages are identified by channel count rather than by module path, since
+    MedNeXt's attribute names are not part of its public interface. Depthwise
+    layers are those with groups equal to in_channels; the 1x1x1 expansion and
+    compression convolutions are left untouched, which is what keeps this an
+    experiment about receptive field rather than about width.
+
+    Returns the number of layers changed, which the caller checks: a silent
+    zero would mean every configuration measured the same network.
     """
+    depthwise = [(n, m) for n, m in model.named_modules()
+                 if isinstance(m, nn.Conv3d) and m.groups == m.in_channels
+                 and m.in_channels > 1]
+    if not depthwise:
+        raise RuntimeError("no depthwise convolutions found; MedNeXt layout changed")
+    widths = sorted({m.in_channels for _, m in depthwise})
+    changed = 0
+    for name, mod in depthwise:
+        stage = min(widths.index(mod.in_channels), len(kernels) - 1)
+        k = kernels[stage]
+        if mod.kernel_size[0] == k:
+            continue
+        parent = model
+        parts = name.split(".")
+        for p in parts[:-1]:
+            parent = getattr(parent, p) if not p.isdigit() else parent[int(p)]
+        new_conv = nn.Conv3d(mod.in_channels, mod.out_channels, k,
+                             stride=mod.stride, padding=k // 2,
+                             groups=mod.groups, bias=mod.bias is not None)
+        setattr(parent, parts[-1], new_conv.to(mod.weight.device))
+        changed += 1
+    return changed
+
+
+def build(kernels):
+    """MedNeXt-B with per-stage depthwise kernel sizes."""
     from nnunet_mednext.network_architecture.mednextv1.create_mednext_v1 import (
         create_mednextv1_base)
     model = create_mednextv1_base(num_input_channels=1, num_classes=3,
-                                  kernel_size=max(kernels), ds=False).cuda().eval()
-    return model
+                                  kernel_size=3, ds=False).cuda()
+    changed = set_stage_kernels(model, kernels)
+    uniform = len(set(kernels)) == 1 and kernels[0] == 3
+    if changed == 0 and not uniform:
+        raise RuntimeError(f"no kernels changed for {kernels}, "
+                           "every configuration would measure the same network")
+    return model.eval(), changed
 
 
 def main():
@@ -159,7 +200,7 @@ def main():
           f"{'train ms':>10}{'train GB':>10}{'RF vox':>8}")
     for name, kernels in PLACEMENTS.items():
         try:
-            model = build(kernels)
+            model, changed = build(kernels)
             fl, pr = count_flops_params(model, x)
             inf, _ = measure(model, x, train=False)
             model.train()
@@ -169,6 +210,7 @@ def main():
                          "params_m": pr / 1e6, "gflops": fl / 1e9,
                          "infer_ms": inf * 1000, "train_ms": tr * 1000,
                          "train_gb": mem, "receptive_field_voxels": rf,
+                         "layers_retuned": changed,
                          "gpu": torch.cuda.get_device_name(0)})
             print(f"{name:<12}{pr/1e6:>10.2f}{fl/1e9:>10.1f}{inf*1000:>10.1f}"
                   f"{tr*1000:>10.1f}{mem:>10.2f}{rf:>8d}")
