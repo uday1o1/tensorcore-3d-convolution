@@ -55,7 +55,7 @@ CLAIMED = {
     "held out, geo gap shape rule": 1.041,
     "held out, rule agreements out of 32": 24,
     "training, geo ratio forward": 0.940,
-    "training, geo ratio backward": 1.030,
+    "training, geo ratio backward": 1.030,   # rtx3090 only; 0.937 on rtx4090
     "training, geo ratio full step": 1.015,
     "training, peak memory median": 2.16,
 }

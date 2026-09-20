@@ -41,11 +41,15 @@ channels with kernel size 5 or above. Speedups reach 2.36x, and on the largest l
 measured it saves 735 ms on a single convolution.
 
 The regime in which this method is evaluated is the regime in which it is worst, in a
-second sense too. Every published number in this family times a forward pass. Measured
-over the same grid, the windowed method averages 0.940 of cuDNN on the forward pass and
-**1.030 on the backward pass**, with a full training step at 1.015. It wins on the pass
-nobody benchmarks and loses on the pass everybody does. The price is memory: peak
-training memory runs at a median of 2.16x cuDNN and up to 5.25x, because a buffer
+second sense too. Every published number in this family times a forward pass, which is
+the less favourable half of a training step. Measured over the same grid on two
+architectures, the backward pass is consistently better for the windowed method than the
+forward pass: 0.940 to 1.030 on an RTX 3090, 0.892 to 0.937 on an RTX 4090. The
+direction holds on both. The sign does not, so we do not claim the method beats cuDNN on
+the backward pass in general, only on the older of the two devices.
+
+The price is memory, and it is the one quantity that does not move across hardware: peak
+training memory runs at a median of 2.16x cuDNN on both devices, because a buffer
 consumed by both passes must be retained between them.
 
 Neither pure strategy is good, which is why the artifact is a dispatcher rather than a
