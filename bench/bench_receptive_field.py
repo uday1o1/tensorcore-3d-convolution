@@ -66,17 +66,38 @@ PATCH = 64
 BATCH = 2
 
 
-def receptive_field(kernels, strides):
+def receptive_field(model, kernels, strides=(2, 2, 2, 1)):
     """Theoretical receptive field in input voxels, one spatial axis.
 
-    r = r + (k - 1) * jump, jump multiplied by stride at each downsample.
-    Reported per axis; the volume is the cube of this.
+    r = r + (k - 1) * jump per convolution, jump multiplied by the stride at
+    each downsample.
+
+    Blocks per stage are counted from the model rather than assumed. An earlier
+    version assumed one convolution per stage and understated the result by
+    about half, since MedNeXt-B carries two blocks per stage. The ratios
+    between placements are almost unaffected by that count, so the ordering
+    survived, but the absolute figures did not.
+
+    This is the theoretical receptive field, an upper bound. The effective
+    receptive field is smaller and roughly Gaussian, and measuring it requires
+    backpropagating from a centre voxel and reading the extent of nonzero input
+    gradient. That is the more meaningful quantity and is left for a run that
+    does not contend with training for GPU memory.
     """
+    per_stage = {}
+    for _, m in model.named_modules():
+        if isinstance(m, nn.Conv3d) and m.groups == m.in_channels and m.in_channels > 1:
+            per_stage.setdefault(m.in_channels, []).append(m.kernel_size[0])
+    widths = sorted(per_stage)
+    counts = [len(per_stage[w]) for w in widths[:len(kernels)]]
+    while len(counts) < len(kernels):
+        counts.append(1)
     r, jump = 1, 1
-    for k, s in zip(kernels, strides):
-        r += (k - 1) * jump
-        jump *= s
-    return r
+    for k, n, st in zip(kernels, counts, strides):
+        for _ in range(n):
+            r += (k - 1) * jump
+        jump *= st
+    return r, counts
 
 
 def count_flops_params(model, x):
@@ -205,7 +226,7 @@ def main():
             inf, _ = measure(model, x, train=False)
             model.train()
             tr, mem = measure(model, x, train=True)
-            rf = receptive_field(kernels, [2, 2, 2, 1])
+            rf, blocks = receptive_field(model, kernels)
             rows.append({"placement": name, "kernels": kernels,
                          "params_m": pr / 1e6, "gflops": fl / 1e9,
                          "infer_ms": inf * 1000, "train_ms": tr * 1000,
