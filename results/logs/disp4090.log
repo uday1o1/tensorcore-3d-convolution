@@ -1,0 +1,67 @@
+/opt/dlbench/.venv/lib/python3.12/site-packages/torch/_subclasses/functional_tensor.py:307: UserWarning: Failed to initialize NumPy: No module named 'numpy' (Triggered internally at /pytorch/torch/csrc/utils/tensor_numpy.cpp:84.)
+  cpu = _conversion_method_template(device=torch.device("cpu"))
+preflight: autotuner against shapes the grid already settled
+           shape    grid   truth  autotune  agree
+     C60 sp64 k3    0.63   False     False   True
+    C240 sp64 k5    1.45    True      True   True
+    C240 sp16 k3    0.84   False     False   True
+    C120 sp64 k9    1.28    True      True   True
+     C30 sp32 k5    0.62   False     False   True
+  autotuner trustworthy: True
+
+held-out grid: C=[48, 96, 192, 320] spatial=[24, 48] k=[3, 5, 7, 9] batch=2
+    C  sp  k  out  cuDNN_ms   win_ms  ratio   rule  correct
+   48  24  3   22      0.05     0.07   0.67  False     True
+   48  24  5   20      0.11     0.12   0.89  False     True
+   48  24  7   18      0.26     0.28   0.94  False     True
+   48  24  9   16      0.35     0.28   1.23   True     True
+   48  48  3   46      0.31     0.58   0.53  False     True
+   48  48  5   44      0.99     1.30   0.76  False     True
+   48  48  7   42      2.22     2.70   0.82  False     True
+   48  48  9   40      3.97     4.19   0.95   True    False
+   96  24  3   22      0.10     0.14   0.71  False     True
+   96  24  5   20      0.30     0.36   0.83  False     True
+   96  24  7   18      0.74     0.76   0.97  False     True
+   96  24  9   16      1.00     1.00   1.00   True    False
+   96  48  3   46      0.83     1.33   0.63  False     True
+   96  48  5   44      2.92     4.09   0.71  False     True
+   96  48  7   42      6.81     8.88   0.77  False     True
+   96  48  9   40     12.34    14.96   0.82   True    False
+  192  24  3   22      0.28     0.36   0.78  False     True
+  192  24  5   20      0.97     1.08   0.90  False     True
+  192  24  7   18      2.30     2.30   1.00  False    False
+  192  24  9   16      3.08     3.04   1.02   True     True
+  192  48  3   46      2.67     3.52   0.76  False     True
+  192  48  5   44     10.10    11.06   0.91  False     True
+  192  48  7   42     24.20    24.46   0.99  False     True
+  192  48  9   40     43.80    43.49   1.01   True     True
+  320  24  3   22      0.79     0.94   0.83  False     True
+  320  24  5   20      2.60     2.80   0.93   True    False
+  320  24  7   18      5.80     5.81   1.00   True    False
+  320  24  9   16      8.95     8.28   1.08   True     True
+  320  48  3   46      7.04     8.45   0.83  False     True
+  320  48  5   44     27.95    28.66   0.98   True    False
+  320  48  7   42     66.85    66.07   1.01   True     True
+  320  48  9   40    123.38   119.89   1.03   True     True
+
+held-out shapes: 32, windowed actually faster in 7
+rule agrees with ground truth in 25/32 (78.1%)
+
+policy comparison, lower gap is better:
+  cudnn      total     364.1 ms   oracle-gap 1.015x   geo-gap 1.011x
+  windowed   total     371.3 ms   oracle-gap 1.035x   geo-gap 1.159x
+  rule       total     362.5 ms   oracle-gap 1.011x   geo-gap 1.011x
+  oracle     total     358.7 ms   oracle-gap 1.000x   geo-gap 1.000x
+
+rule vs always-cuDNN:    1.000x better
+rule vs always-windowed: 1.147x better
+
+claim 'dispatch beats both pure strategies on unseen shapes': HOLDS
+
+7 disagreements:
+  C 96 sp48 k 9: rule said windowed, ratio 0.82, cost +2.63 ms
+  C320 sp48 k 5: rule said windowed, ratio 0.98, cost +0.72 ms
+  C 48 sp48 k 9: rule said windowed, ratio 0.95, cost +0.22 ms
+  C320 sp24 k 5: rule said windowed, ratio 0.93, cost +0.19 ms
+  C320 sp24 k 7: rule said windowed, ratio 1.00, cost +0.01 ms
+  C 96 sp24 k 9: rule said windowed, ratio 1.00, cost +0.00 ms

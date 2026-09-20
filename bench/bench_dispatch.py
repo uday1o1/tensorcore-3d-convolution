@@ -201,9 +201,30 @@ def main(trials=5):
     print(f"\nrule vs always-cuDNN:    {g_cud/g_rule:.3f}x better")
     print(f"rule vs always-windowed: {g_win/g_rule:.3f}x better")
 
-    # The rule is only worth stating if it beats both pure strategies.
-    verdict = "HOLDS" if (g_rule < g_cud and g_rule < g_win) else "FAILS"
+    # The rule is only worth stating if it beats both pure strategies by a
+    # margin worth the complexity. An earlier version declared HOLDS on any
+    # improvement at all and reported success on an RTX 4090 where the rule
+    # beat always-cuDNN by 0.01 percent, which is a tie dressed up as a win.
+    MARGIN = 0.01   # 1 percent
+    gain_c, gain_w = g_cud / g_rule - 1, g_win / g_rule - 1
+    if gain_c > MARGIN and gain_w > MARGIN:
+        verdict = "HOLDS"
+    elif gain_c > 0 and gain_w > 0:
+        verdict = f"TIE (beats both by under {MARGIN:.0%}, not worth the complexity)"
+    else:
+        verdict = "FAILS"
     print(f"\nclaim 'dispatch beats both pure strategies on unseen shapes': {verdict}")
+    print(f"  margin over always-cuDNN {gain_c:+.2%}, over always-windowed {gain_w:+.2%}")
+
+    # Which way the rule errs says whether it is mistuned for this device.
+    over = sum(1 for r in rows if r["rule_says_windowed"]
+               and not r["windowed_actually_faster"])
+    under = sum(1 for r in rows if not r["rule_says_windowed"]
+                and r["windowed_actually_faster"])
+    if over or under:
+        lean = "over-aggressive" if over > under else "too conservative"
+        print(f"  the rule leans {lean} here: {over} over-aggressive, "
+              f"{under} too conservative")
 
     # Where the rule is wrong, how much does it cost?
     bad = [r for r in rows if r["rule_says_windowed"] != r["windowed_actually_faster"]]
