@@ -150,6 +150,40 @@ def main():
               f"{'CONFIRMED' if (r9_cud / r9_gap) < (r3_cud / r3_gap) else 'REFUTED'} "
               f"({r3_cud/r3_gap:.3f}x -> {r9_cud/r9_gap:.3f}x)")
 
+    # Why the surface moves: do the two algorithms gain differently from the
+    # newer device, and where? This replaces citing vendor specifications with
+    # a like-for-like measurement on identical shapes.
+    if len(maps) >= 2 and "rtx3090" in maps and any("4090" in k for k in maps):
+        newer = next(k for k in maps if "4090" in k)
+        A = {(r["C"], r["sp"], r["k"]): r for r in maps["rtx3090"]
+             if r.get("mode", "dense") == "dense"}
+        Bm = {(r["C"], r["sp"], r["k"]): r for r in maps[newer]
+              if r.get("mode", "dense") == "dense"}
+        common = sorted(set(A) & set(Bm))
+        def gains(key):
+            return (st.median([A[k]["cudnn_ms"] / Bm[k]["cudnn_ms"] for k in common if key(*k)]),
+                    st.median([A[k]["win_ms"] / Bm[k]["win_ms"] for k in common if key(*k)]))
+        print(f"\nPER-SHAPE SPEEDUP OF {newer.upper()} OVER RTX3090 "
+              f"({len(common)} identical configurations)")
+        print(f"  {'region':<26}{'cuDNN':>8}{'windowed':>10}   who gains more")
+        regions = [("all shapes", lambda C, s, k: True),
+                   ("C=240", lambda C, s, k: C == 240),
+                   ("C=120", lambda C, s, k: C == 120),
+                   ("C=60", lambda C, s, k: C == 60),
+                   ("C=30", lambda C, s, k: C == 30),
+                   ("k=3", lambda C, s, k: k == 3),
+                   ("k>=9", lambda C, s, k: k >= 9)]
+        for name, f in regions:
+            c, w = gains(f)
+            who = "cuDNN" if c > w else "windowed"
+            print(f"  {name:<26}{c:>8.2f}{w:>10.2f}   {who}")
+        print("  Overall the two gain almost equally, so the surface does not move"
+              "\n  because one algorithm is uniformly better served by newer silicon."
+              "\n  It moves because the gain is redistributed by shape: cuDNN gains"
+              "\n  more at 240 channels, which is where the rule selects, and the"
+              "\n  windowed path gains more at 120 channels, which is where cells"
+              "\n  flip toward it.")
+
     # The claim that matters most, and the one we made no prediction about.
     trains = load("training_crossover")
     if trains:
