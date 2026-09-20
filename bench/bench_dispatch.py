@@ -85,12 +85,31 @@ def preflight():
     """Check the autotuner reproduces decisions the grid already settled.
 
     The autotuner is used as the oracle the rule is scored against, so it has
-    to be trustworthy before any of the held-out numbers mean anything. These
-    five shapes are in the measured grid, with known and unambiguous winners.
+    to be trustworthy before any of the held-out numbers mean anything.
+
+    The reference shapes are read from THIS DEVICE's own crossover map. An
+    earlier version hardcoded values measured on an RTX 3090, which silently
+    checked one device's autotuner against another device's ground truth. That
+    is not a hypothetical: C240 at 64 cubed with kernel size 5 measures 1.45 on
+    an RTX 3090 and 0.99 on an RTX 4090, opposite winners, so the hardcoded
+    check would have validated a wrong answer as right.
+
+    Shapes are chosen for being unambiguous on this device, furthest from
+    parity, since a cell near 1.0 cannot adjudicate anything.
     """
     from dispatch import DispatchingConv3d
-    known = {(60, 64, 3): 0.63, (240, 64, 5): 1.45, (240, 16, 3): 0.84,
-             (120, 64, 9): 1.28, (30, 32, 5): 0.62}
+    own = ROOT / "results" / f"crossover_map_{device_tag()}.json"
+    if own.exists():
+        rows = [r for r in json.load(open(own)) if r.get("mode", "dense") == "dense"]
+        rows.sort(key=lambda r: -abs(math.log(r["ratio"])))
+        known = {(r["C"], r["sp"], r["k"]): r["ratio"] for r in rows[:5]}
+        print(f"preflight reference: {own.name}")
+    else:
+        print(f"preflight: no crossover map for {device_tag()}, falling back to "
+              f"RTX 3090 values. Run bench_crossover.py on this device first for "
+              f"a meaningful check.")
+        known = {(60, 64, 3): 0.63, (240, 64, 5): 1.45, (240, 16, 3): 0.84,
+                 (120, 64, 9): 1.28, (30, 32, 5): 0.62}
     print("preflight: autotuner against shapes the grid already settled")
     hdr = ("shape", "grid", "truth", "autotune", "agree")
     print(f"  {hdr[0]:>14}{hdr[1]:>8}{hdr[2]:>8}{hdr[3]:>10}{hdr[4]:>7}")
