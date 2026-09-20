@@ -1,0 +1,70 @@
+[
+ {
+  "placement": "3-3-3-3",
+  "kernels": [
+   3,
+   3,
+   3,
+   3
+  ],
+  "params_m": 10.52634,
+  "gflops": 86.690269952,
+  "infer_ms": 48.343634605407715,
+  "train_ms": 120.02456188201904,
+  "train_gb": 2.549429248,
+  "receptive_field_voxels": 31,
+  "layers_retuned": 0,
+  "gpu": "NVIDIA GeForce RTX 3090"
+ },
+ {
+  "placement": "3-3-5-5",
+  "kernels": [
+   3,
+   3,
+   5,
+   5
+  ],
+  "params_m": 10.814852,
+  "gflops": 87.775677184,
+  "infer_ms": 50.13232231140137,
+  "train_ms": 129.81798648834229,
+  "train_gb": 2.55116032,
+  "receptive_field_voxels": 55,
+  "layers_retuned": 12,
+  "gpu": "NVIDIA GeForce RTX 3090"
+ },
+ {
+  "placement": "3-5-5-7",
+  "kernels": [
+   3,
+   5,
+   5,
+   7
+  ],
+  "params_m": 11.348484,
+  "gflops": 91.695385344,
+  "infer_ms": 59.21885967254639,
+  "train_ms": 157.85608291625977,
+  "train_gb": 2.554363392,
+  "receptive_field_voxels": 75,
+  "layers_retuned": 17,
+  "gpu": "NVIDIA GeForce RTX 3090"
+ },
+ {
+  "placement": "5-5-5-5",
+  "kernels": [
+   5,
+   5,
+   5,
+   5
+  ],
+  "params_m": 10.861892,
+  "gflops": 104.731151104,
+  "infer_ms": 68.99256706237793,
+  "train_ms": 239.93873596191406,
+  "train_gb": 2.55144448,
+  "receptive_field_voxels": 61,
+  "layers_retuned": 22,
+  "gpu": "NVIDIA GeForce RTX 3090"
+ }
+]
