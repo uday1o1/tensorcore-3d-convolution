@@ -53,6 +53,7 @@ import torch.nn as nn
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))
+from kernel_placement import set_stage_kernels, receptive_field
 
 # The placements named in the review, plus the uniform-5 upper bound they
 # should be compared against.
@@ -64,40 +65,6 @@ PLACEMENTS = {
 }
 PATCH = 64
 BATCH = 2
-
-
-def receptive_field(model, kernels, strides=(2, 2, 2, 1)):
-    """Theoretical receptive field in input voxels, one spatial axis.
-
-    r = r + (k - 1) * jump per convolution, jump multiplied by the stride at
-    each downsample.
-
-    Blocks per stage are counted from the model rather than assumed. An earlier
-    version assumed one convolution per stage and understated the result by
-    about half, since MedNeXt-B carries two blocks per stage. The ratios
-    between placements are almost unaffected by that count, so the ordering
-    survived, but the absolute figures did not.
-
-    This is the theoretical receptive field, an upper bound. The effective
-    receptive field is smaller and roughly Gaussian, and measuring it requires
-    backpropagating from a centre voxel and reading the extent of nonzero input
-    gradient. That is the more meaningful quantity and is left for a run that
-    does not contend with training for GPU memory.
-    """
-    per_stage = {}
-    for _, m in model.named_modules():
-        if isinstance(m, nn.Conv3d) and m.groups == m.in_channels and m.in_channels > 1:
-            per_stage.setdefault(m.in_channels, []).append(m.kernel_size[0])
-    widths = sorted(per_stage)
-    counts = [len(per_stage[w]) for w in widths[:len(kernels)]]
-    while len(counts) < len(kernels):
-        counts.append(1)
-    r, jump = 1, 1
-    for k, n, st in zip(kernels, counts, strides):
-        for _ in range(n):
-            r += (k - 1) * jump
-        jump *= st
-    return r, counts
 
 
 def count_flops_params(model, x):
@@ -151,48 +118,6 @@ def measure(model, x, train=False, reps=10, warmup=3):
         step()
     torch.cuda.synchronize()
     return (time.time() - t0) / reps, torch.cuda.max_memory_allocated() / 1e9
-
-
-def set_stage_kernels(model, kernels):
-    """Give each encoder stage its own depthwise kernel size.
-
-    MedNeXt exposes one kernel size for the whole network, but per-stage
-    placement is the question under review, so the depthwise convolutions are
-    replaced after construction. A Conv3d's kernel size cannot be reassigned in
-    place because the weight tensor shape is fixed, so each is swapped for a
-    new one with matching channels, groups and stride, and same padding.
-
-    Stages are identified by channel count rather than by module path, since
-    MedNeXt's attribute names are not part of its public interface. Depthwise
-    layers are those with groups equal to in_channels; the 1x1x1 expansion and
-    compression convolutions are left untouched, which is what keeps this an
-    experiment about receptive field rather than about width.
-
-    Returns the number of layers changed, which the caller checks: a silent
-    zero would mean every configuration measured the same network.
-    """
-    depthwise = [(n, m) for n, m in model.named_modules()
-                 if isinstance(m, nn.Conv3d) and m.groups == m.in_channels
-                 and m.in_channels > 1]
-    if not depthwise:
-        raise RuntimeError("no depthwise convolutions found; MedNeXt layout changed")
-    widths = sorted({m.in_channels for _, m in depthwise})
-    changed = 0
-    for name, mod in depthwise:
-        stage = min(widths.index(mod.in_channels), len(kernels) - 1)
-        k = kernels[stage]
-        if mod.kernel_size[0] == k:
-            continue
-        parent = model
-        parts = name.split(".")
-        for p in parts[:-1]:
-            parent = getattr(parent, p) if not p.isdigit() else parent[int(p)]
-        new_conv = nn.Conv3d(mod.in_channels, mod.out_channels, k,
-                             stride=mod.stride, padding=k // 2,
-                             groups=mod.groups, bias=mod.bias is not None)
-        setattr(parent, parts[-1], new_conv.to(mod.weight.device))
-        changed += 1
-    return changed
 
 
 def build(kernels):
