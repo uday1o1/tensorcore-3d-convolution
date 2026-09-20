@@ -50,6 +50,26 @@ KERNELS = [3, 5, 7, 9]
 BATCH = 2
 
 
+
+def device_tag():
+    """Short filesystem-safe name for the GPU, so multi-device runs coexist."""
+    name = torch.cuda.get_device_name(0)
+    return (name.replace("NVIDIA ", "").replace("GeForce ", "")
+                .replace(" ", "").replace("/", "-").lower())
+
+
+def device_meta():
+    """Everything needed to interpret a timing later."""
+    p = torch.cuda.get_device_properties(0)
+    return {"gpu": torch.cuda.get_device_name(0),
+            "capability": f"{p.major}.{p.minor}",
+            "sm_count": p.multi_processor_count,
+            "total_mem_gb": round(p.total_memory / 1e9, 1),
+            "torch": torch.__version__,
+            "cuda": torch.version.cuda,
+            "cudnn": torch.backends.cudnn.version()}
+
+
 def timeit(fn, n=8):
     for _ in range(3):
         fn()
@@ -117,7 +137,7 @@ def main(trials=5):
                     tw = st.median([b for _, b in pairs])
                     said = prefer_windowed(C, sp, k)
                     truth = tw < tc
-                    rows.append({"C": C, "sp": sp, "k": k, "out": out,
+                    rows.append({**device_meta(), "C": C, "sp": sp, "k": k, "out": out,
                                  "batch": BATCH, "trials": trials,
                                  "cudnn_ms": tc * 1000, "win_ms": tw * 1000,
                                  "ratio": tc / tw, "rule_says_windowed": said,
@@ -134,7 +154,7 @@ def main(trials=5):
     if not rows:
         print("no configurations measured")
         return 1
-    json.dump(rows, open(ROOT / "results" / "dispatch_heldout.json", "w"), indent=1)
+    json.dump(rows, open(ROOT / "results" / f"dispatch_heldout_{device_tag()}.json", "w"), indent=1)
 
     oracle = sum(min(r["cudnn_ms"], r["win_ms"]) for r in rows)
 

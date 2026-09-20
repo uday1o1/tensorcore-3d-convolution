@@ -60,6 +60,26 @@ KERNELS = [3, 5, 7, 9, 11]
 BATCH = 2
 
 
+
+def device_tag():
+    """Short filesystem-safe name for the GPU, so multi-device runs coexist."""
+    name = torch.cuda.get_device_name(0)
+    return (name.replace("NVIDIA ", "").replace("GeForce ", "")
+                .replace(" ", "").replace("/", "-").lower())
+
+
+def device_meta():
+    """Everything needed to interpret a timing later."""
+    p = torch.cuda.get_device_properties(0)
+    return {"gpu": torch.cuda.get_device_name(0),
+            "capability": f"{p.major}.{p.minor}",
+            "sm_count": p.multi_processor_count,
+            "total_mem_gb": round(p.total_memory / 1e9, 1),
+            "torch": torch.__version__,
+            "cuda": torch.version.cuda,
+            "cudnn": torch.backends.cudnn.version()}
+
+
 def timeit(fn, n=6, warmup=3):
     for _ in range(warmup):
         fn()
@@ -126,7 +146,7 @@ def main(trials=5):
                         mem[name] = torch.cuda.max_memory_allocated() / 1e9
 
                     rf, rt = f_ref / f_win, t_ref / t_win
-                    rows.append({"C": C, "sp": sp, "k": k, "batch": BATCH,
+                    rows.append({**device_meta(), "C": C, "sp": sp, "k": k, "batch": BATCH,
                                  "trials": trials,
                                  "fwd_cudnn_ms": f_ref * 1000,
                                  "fwd_win_ms": f_win * 1000, "fwd_ratio": rf,
@@ -148,7 +168,7 @@ def main(trials=5):
     if not rows:
         print("nothing measured")
         return 1
-    json.dump(rows, open(ROOT / "results" / "training_crossover.json", "w"), indent=1)
+    json.dump(rows, open(ROOT / "results" / f"training_crossover_{device_tag()}.json", "w"), indent=1)
 
     shifts = [r["shift"] for r in rows]
     better = sum(s > 0 for s in shifts)

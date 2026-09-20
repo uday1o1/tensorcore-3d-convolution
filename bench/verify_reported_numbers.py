@@ -1,5 +1,9 @@
 """Recomputes every derived number reported in the write-up from results/.
 
+All reported numbers come from the RTX 3090, the GPU class Im2win's own
+evaluation used. Other devices write their own device-tagged files; this checks
+the ones the write-up quotes.
+
 The measured data in results/ is raw: per-configuration timings. Most of the
 claims made about it are derived, things like win counts, medians, geometric
 means against an oracle, and rule agreement rates. A reader has no way to check
@@ -74,15 +78,15 @@ def geo_gap(rows, pick):
 
 
 def main():
-    cm = ROOT / "results" / "crossover_map.json"
-    ho = ROOT / "results" / "dispatch_heldout.json"
+    cm = ROOT / "results" / "crossover_map_rtx3090.json"
+    ho = ROOT / "results" / "dispatch_heldout_rtx3090.json"
     missing = [p.name for p in (cm, ho) if not p.exists()]
     if missing:
         print(f"missing results files: {', '.join(missing)}")
         print("regenerate with bench_crossover.py and bench_dispatch.py")
         return 1
 
-    tc = ROOT / "results" / "training_crossover.json"
+    tc = ROOT / "results" / "training_crossover_rtx3090.json"
     allrows = json.load(open(cm))
     dense = [r for r in allrows if r.get("mode", "dense") == "dense"]
     depth = [r for r in allrows if r.get("mode") == "depthwise"]

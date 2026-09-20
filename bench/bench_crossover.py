@@ -41,6 +41,26 @@ KERNELS = [3, 5, 7, 9, 11]
 BATCH = 2
 
 
+
+def device_tag():
+    """Short filesystem-safe name for the GPU, so multi-device runs coexist."""
+    name = torch.cuda.get_device_name(0)
+    return (name.replace("NVIDIA ", "").replace("GeForce ", "")
+                .replace(" ", "").replace("/", "-").lower())
+
+
+def device_meta():
+    """Everything needed to interpret a timing later."""
+    p = torch.cuda.get_device_properties(0)
+    return {"gpu": torch.cuda.get_device_name(0),
+            "capability": f"{p.major}.{p.minor}",
+            "sm_count": p.multi_processor_count,
+            "total_mem_gb": round(p.total_memory / 1e9, 1),
+            "torch": torch.__version__,
+            "cuda": torch.version.cuda,
+            "cudnn": torch.backends.cudnn.version()}
+
+
 def timeit(fn, n=8):
     for _ in range(3):
         fn()
@@ -79,7 +99,7 @@ def sweep(mode, trials, rows):
                     ratios = [a / b for a, b in pairs]
                     tc = st.median([a for a, _ in pairs])
                     tw = st.median([b for _, b in pairs])
-                    rows.append({"mode": mode, "C": C, "sp": sp, "k": k, "out": out,
+                    rows.append({**device_meta(), "mode": mode, "C": C, "sp": sp, "k": k, "out": out,
                                  "batch": BATCH, "trials": trials,
                                  "cudnn_ms": tc * 1000, "win_ms": tw * 1000,
                                  "ratio": tc / tw,
@@ -97,7 +117,7 @@ def main(trials=3):
     rows = []
     sweep("dense", trials, rows)
     sweep("depthwise", trials, rows)
-    json.dump(rows, open(ROOT / "results" / "crossover_map.json", "w"), indent=1)
+    json.dump(rows, open(ROOT / "results" / f"crossover_map_{device_tag()}.json", "w"), indent=1)
 
     for mode in ("dense", "depthwise"):
         sel = [r for r in rows if r["mode"] == mode]
