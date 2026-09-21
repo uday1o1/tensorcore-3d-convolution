@@ -1,0 +1,32 @@
+{
+ "summaries": [
+  "/workspace/RESULTS_FOLDER/nnUNet/3d_fullres/Task003_Liver/nnUNetTrainerV2_MedNeXt_B_k3_150ep_s1__nnUNetPlansv2.1_trgSp_1x1x1/fold_0/validation_raw/summary.json",
+  "/workspace/RESULTS_FOLDER/nnUNet/3d_fullres/Task003_Liver/nnUNetTrainerV2_MedNeXt_B_k3_150ep_s2__nnUNetPlansv2.1_trgSp_1x1x1/fold_0/validation_raw/summary.json"
+ ],
+ "classes": {
+  "1": {
+   "name": "liver",
+   "seed1": 0.963914509765464,
+   "seed2": 0.9644139738339856,
+   "spread": 0.0004994640685216378,
+   "per_case_sd": 0.004582137635091008,
+   "paired_p": 0.7915680312154842,
+   "n_used": 27,
+   "n_dropped_absent_class": 0
+  },
+  "2": {
+   "name": "tumor",
+   "seed1": 0.6627601967038256,
+   "seed2": 0.7034400713105393,
+   "spread": 0.04067987460671374,
+   "per_case_sd": 0.15860788505970264,
+   "paired_p": 0.048674875673468954,
+   "n_used": 25,
+   "n_dropped_absent_class": 2
+  }
+ },
+ "mean_spread": 0.02058966933761769,
+ "worst_spread": 0.04067987460671374,
+ "target_effect": 0.002,
+ "verdict": "NO GO"
+}
