@@ -34,6 +34,7 @@ Usage:
   python analyze_variance_pilot.py           # uses the two pilot trainer paths
 """
 import json
+import math
 import statistics as st
 import sys
 from pathlib import Path
@@ -71,7 +72,7 @@ def wilcoxon_signed_rank(diffs):
     Returns None when too few nonzero differences for the approximation to
     mean anything, rather than returning a number that looks like evidence.
     """
-    nz = [d for d in diffs if d != 0]
+    nz = [d for d in diffs if d != 0 and not math.isnan(d)]
     n = len(nz)
     if n < 6:
         return None
@@ -86,7 +87,6 @@ def wilcoxon_signed_rank(diffs):
         return None
     z = (w_plus - mean) / sd
     # two-sided normal tail
-    import math
     return 2 * (1 - 0.5 * (1 + math.erf(abs(z) / math.sqrt(2))))
 
 
@@ -116,9 +116,21 @@ def main(argv):
     spreads = []
     report = {}
     for c in classes:
-        a = [runs[0][k][c] for k in shared if c in runs[0][k] and c in runs[1][k]]
-        b = [runs[1][k][c] for k in shared if c in runs[0][k] and c in runs[1][k]]
-        if not a:
+        # A class Dice is NaN for cases that do not contain that class. Liver
+        # tumour is absent from some validation volumes, so those cases carry
+        # no information about this class and must be dropped rather than
+        # averaged. Keeping them crashes statistics.stdev, which is how this
+        # was found; silently coercing them to zero would have been worse,
+        # since it would drag both means toward zero and shrink the apparent
+        # spread, making the noise floor look smaller than it is.
+        usable = [k for k in shared
+                  if c in runs[0][k] and c in runs[1][k]
+                  and not math.isnan(runs[0][k][c]) and not math.isnan(runs[1][k][c])]
+        dropped = len(shared) - len(usable)
+        a = [runs[0][k][c] for k in usable]
+        b = [runs[1][k][c] for k in usable]
+        if len(a) < 2:
+            print(f"{CLASS_NAMES.get(c, c):<10}  only {len(a)} usable cases, skipped")
             continue
         ma, mb = st.mean(a), st.mean(b)
         diffs = [x - y for x, y in zip(a, b)]
@@ -127,10 +139,11 @@ def main(argv):
         spreads.append(abs(ma - mb))
         report[c] = {"name": CLASS_NAMES.get(c, c), "seed1": ma, "seed2": mb,
                      "spread": abs(ma - mb), "per_case_sd": sd, "paired_p": p,
-                     "n": len(a)}
+                     "n_used": len(a), "n_dropped_absent_class": dropped}
         ps = f"{p:.3f}" if p is not None else "n/a"
+        note = f"  ({len(a)} cases" + (f", {dropped} lack the class)" if dropped else ")")
         print(f"{CLASS_NAMES.get(c, c):<10}{ma:>10.4f}{mb:>10.4f}"
-              f"{abs(ma-mb):>10.4f}{sd:>13.4f}{ps:>10}")
+              f"{abs(ma-mb):>10.4f}{sd:>13.4f}{ps:>10}{note}")
 
     worst = max(spreads) if spreads else 0.0
     mean_spread = st.mean(spreads) if spreads else 0.0
