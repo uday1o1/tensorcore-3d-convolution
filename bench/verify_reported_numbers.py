@@ -58,6 +58,14 @@ CLAIMED = {
     "training, geo ratio backward": 1.030,   # rtx3090 only; 0.937 on rtx4090
     "training, geo ratio full step": 1.015,
     "training, peak memory median": 2.16,
+    # Part II, kernel placement
+    "placement, 5-5-5-5 train cost": 2.00,
+    "placement, 3-5-5-7 train cost": 1.32,
+    "placement, 3-3-5-5 train cost": 1.08,
+    "placement, 5-5-5-5 FLOP cost": 1.21,
+    "pilot, tumor spread": 0.0407,
+    "pilot, liver spread": 0.0005,
+    "pilot, tumor paired p": 0.049,
 }
 
 
@@ -93,6 +101,10 @@ def main():
     held = json.load(open(ho))
 
     train = json.load(open(tc)) if tc.exists() else []
+    rf_path = ROOT / "results" / "receptive_field_cost.json"
+    pilot_path = ROOT / "results" / "variance_pilot.json"
+    rf = json.load(open(rf_path)) if rf_path.exists() else []
+    pilot = json.load(open(pilot_path)) if pilot_path.exists() else {}
 
     def geo(vals):
         return math.exp(sum(math.log(v) for v in vals) / len(vals))
@@ -133,7 +145,34 @@ def main():
         for k in list(CLAIMED):
             if k.startswith("training,"):
                 CLAIMED.pop(k)
-        print("note: results/training_crossover.json absent, skipping training claims\n")
+        print("note: training_crossover absent, skipping training claims\n")
+
+    if rf:
+        by = {r["placement"]: r for r in rf}
+        base = by["3-3-3-3"]
+        for name in ("5-5-5-5", "3-5-5-7", "3-3-5-5"):
+            if name in by:
+                computed[f"placement, {name} train cost"] = (
+                    by[name]["train_ms"] / base["train_ms"])
+        if "5-5-5-5" in by:
+            computed["placement, 5-5-5-5 FLOP cost"] = (
+                by["5-5-5-5"]["gflops"] / base["gflops"])
+    else:
+        for k in list(CLAIMED):
+            if k.startswith("placement,"):
+                CLAIMED.pop(k)
+        print("note: receptive_field_cost absent, skipping placement claims\n")
+
+    if pilot:
+        for c in pilot.get("classes", {}).values():
+            computed[f"pilot, {c['name']} spread"] = c["spread"]
+            if c.get("paired_p") is not None:
+                computed[f"pilot, {c['name']} paired p"] = c["paired_p"]
+    else:
+        for k in list(CLAIMED):
+            if k.startswith("pilot,"):
+                CLAIMED.pop(k)
+        print("note: variance_pilot absent, skipping pilot claims\n")
 
     print(f"crossover grid: {len(dense)} dense, {len(depth)} depthwise, "
           f"{dense[0].get('trials','?')} trials each")

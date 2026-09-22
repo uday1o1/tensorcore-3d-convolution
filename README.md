@@ -1,4 +1,4 @@
-# Tensor Core Accelerated 3D Convolution for Medical Image Segmentation
+# Convolution Cost in Volumetric Segmentation
 
 **Course:** CMPE 258, Deep Learning, Fall 2026, Prof. Kaikai Liu
 **Team:** Uday Arora
@@ -20,45 +20,58 @@ The same mechanism locates a regime the literature does not benchmark. Because i
 - `proposal.md`: problem formulation, technical approach, device and maintainer (Deliverable C)
 - `novelty-feasibility-audit.md`: AI novelty and feasibility audit (Deliverable D)
 - `src/`: shape-generic windowed convolution for 2D and 3D, FFT convolution, the
-  drop-in `nn.Conv3d` replacement, and the shape-aware dispatcher. See `src/README.md`.
+  drop-in `nn.Conv3d` replacement, the shape-aware dispatcher, and the per-stage
+  kernel placement utilities. See `src/README.md`.
 - `bench/`: correctness verification and every benchmark behind the reported numbers.
 - `results/`: the measured data those benchmarks produced.
 - `requirements.txt`: pinned versions the measurements were taken with.
 
-## Headline result
+## Headline results
 
-Windowed convolution is usually presented as a faster alternative to cuDNN. Measured
-with complete accounting it is not, at the kernel sizes everyone benchmarks. It is
-2.34 times slower than cuDNN substituted into a whole 3D segmentation network, on 3.9
-times the memory, at numerically identical accuracy.
+The project has two parts. The first asks whether the convolution itself can be
+made cheaper. The second takes the answer as given and asks where the
+convolution is worth spending.
 
-But the two algorithms scale differently in kernel size. Implicit GEMM scales with the
-`k^3` growth in work, while windowed materialization grows only linearly in `k`. The
-curves cross. Across a 60-configuration sweep at seven trials each, the windowed method
-wins in 26. It never wins at kernel size 3, the size essentially every published
-convolution benchmark uses, in any of the 12 shapes measured. It wins in 11 of 12 at 240
-channels with kernel size 5 or above. Speedups reach 2.36x, and on the largest layer
-measured it saves 735 ms on a single convolution.
+**Part I, windowed convolution.** Presented in the literature as a faster
+alternative to cuDNN, measured with complete accounting it is not, at the kernel
+sizes everyone benchmarks. Substituted into a whole 3D segmentation network it
+is 2.34x slower on 3.9x the memory, at numerically identical accuracy.
 
-The regime in which this method is evaluated is the regime in which it is worst, in a
-second sense too. Every published number in this family times a forward pass, which is
-the less favourable half of a training step. Measured over the same grid on two
-architectures, the backward pass is consistently better for the windowed method than the
-forward pass: 0.940 to 1.030 on an RTX 3090, 0.892 to 0.937 on an RTX 4090. The
-direction holds on both. The sign does not, so we do not claim the method beats cuDNN on
-the backward pass in general, only on the older of the two devices.
+The two algorithms do scale differently in kernel size, and the curves cross.
+Across a 60-configuration sweep at seven trials each the windowed method wins in
+26: never at kernel size 3 in any of the 12 shapes measured, and in 11 of 12 at
+240 channels with kernel size 5 or above. Neither pure strategy is close to
+optimal, so the useful artifact is a dispatcher rather than a replacement, and a
+rule reading only layer shape lands within 2.1% of a per-shape oracle against
+13.2% and 16.0% for the pure strategies.
 
-The price is memory, and it is the one quantity that does not move across hardware: peak
-training memory runs at a median of 2.16x cuDNN on both devices, because a buffer
-consumed by both passes must be retained between them.
+That rule then fails in two ways worth reporting. On a whole network at kernel
+size 9 it regresses to 0.819x where an autotuner reaches 1.025x. And on a second
+GPU architecture, 17 of 60 configurations change winner, the clause that looked
+strongest on Ampere is dead on Ada, and the rule's advantage over simply calling
+cuDNN falls from 8.25% to 0.01%. The method's niche narrows as compute-to-
+bandwidth rises, which is the direction hardware moves.
 
-Neither pure strategy is good, which is why the artifact is a dispatcher rather than a
-replacement: always using cuDNN sits 13.2 percent off a per-shape oracle and always
-using the windowed method sits 16.0 percent off, while a rule reading only layer shape
-sits 2.1 percent off. Substituted into whole networks it does no harm at kernel size 3
-and wins at kernel size 7, both at lower peak memory than cuDNN, and it fails at kernel
-size 9 where a measurement-based autotuner does not. That failure is reported, not
-tuned away.
+**Part II, kernel placement.** Given that the cost is close to fixed, the
+question is where to spend it, and the thing worth buying is receptive field.
+Cost is very unevenly distributed across stages: enlarging an early-stage kernel
+is expensive because it carries the full spatial extent, while a deep stage has
+been downsampled repeatedly and is nearly free to enlarge.
+
+Measured on MedNeXt with standard operations only, uniform enlargement is Pareto
+dominated. Placing large kernels deep (3-5-5-7) obtains more receptive field
+than enlarging every stage (5-5-5-5), 149 voxels against 121, at lower cost,
+1.32x against 2.00x. It is better on both axes at once, which needs no accuracy
+measurement to establish. FLOPs miss this entirely, rating uniform enlargement at
+1.21x where the measured training step is 2.00x.
+
+**Why no placement accuracy comparison.** Two runs of one configuration
+differing only in random seed differ by 0.0407 tumour Dice, twenty times the
+effect such a study chases, and a paired signed-rank test across validation
+cases calls them significantly different at p = 0.049 despite there being no
+architectural difference to detect. Single-run ablations on a single fold of this
+task can manufacture significance from seed noise, and only a replicate exposes
+it.
 
 ## Reproducing
 
@@ -82,7 +95,11 @@ CUDA GPU. Only the accuracy arm needs data we cannot redistribute.
 | `bench/verify_reported_numbers.py` | checks every derived number in the write-up against `results/` | nothing, no GPU or torch |
 | `bench/bench_crossover.py` | `results/crossover_map.json`, the crossover grid | GPU only |
 | `bench/bench_dispatch.py` | `results/dispatch_heldout.json`, held-out rule test | GPU only |
-| `bench/bench_training_crossover.py` | `results/training_crossover.json`, forward vs backward vs full step | GPU only |
+| `bench/bench_training_crossover.py` | `results/training_crossover_<gpu>.json`, forward vs backward vs full step | GPU only |
+| `bench/compare_devices.py` | cross-device comparison and prediction audit | nothing, reads `results/` |
+| `bench/bench_receptive_field.py` | `results/receptive_field_cost.json`, Part II cost axis | GPU + MedNeXt fork |
+| `bench/bench_effective_receptive_field.py` | `results/effective_receptive_field.json`, measured reach | GPU + MedNeXt fork |
+| `bench/analyze_variance_pilot.py` | `results/variance_pilot.json`, the go/no-go verdict | nothing, reads two validation summaries |
 | `bench/bench_reproduce_im2win.py` | the 1.56x and 1.13x reproduction figures | GPU; the kernel-only number additionally needs Im2win built via `bench/CMakeLists.txt` |
 | `bench/bench_end_to_end.py` | whole network substitution cost | GPU + MedNeXt fork |
 | `bench/bench_dispatch_network.py` | dispatcher on real networks | GPU + MedNeXt fork |
