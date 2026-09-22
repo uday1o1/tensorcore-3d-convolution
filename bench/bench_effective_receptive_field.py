@@ -46,7 +46,11 @@ PLACEMENTS = {
     "3-5-5-7": [3, 5, 5, 7],
     "5-5-5-5": [5, 5, 5, 5],
 }
-PATCH = 96          # large enough that the field is not clipped by the border
+# The theoretical receptive field of these placements is 151 to 371 voxels,
+# larger than any patch that fits in memory for this architecture. Support is
+# therefore clipped by the input and carries no information; the mass measures
+# are what can actually be compared. See the clipping check in main().
+PATCH = 96
 MASS_FRACTIONS = (0.5, 0.9)
 
 
@@ -131,7 +135,9 @@ def main():
                          "mass90": m90, "mass50": m50,
                          "layers_retuned": changed, "patch": PATCH,
                          "gpu": torch.cuda.get_device_name(0)})
-            print(f"{name:<12}{theo:>12}{support:>9}{m90:>8}{m50:>8}{changed:>9}")
+            clipped = support >= PATCH
+            print(f"{name:<12}{theo:>12}{support:>9}{m90:>8}{m50:>8}{changed:>9}"
+                  f"{'  (support clipped)' if clipped else ''}")
             del model
             torch.cuda.empty_cache()
         except Exception as e:
@@ -157,10 +163,21 @@ def main():
     if a and b:
         print(f"\nPart II dominance claim, 3-5-5-7 against 5-5-5-5 "
               f"(3-5-5-7 costs 1.32x, 5-5-5-5 costs 2.00x):")
+        clipped = any(r["support"] >= PATCH for r in rows)
         for key in ("theoretical", "support", "mass90", "mass50"):
+            if key == "support" and clipped:
+                print(f"  {key:<12} {a[key]:>5} vs {b[key]:>5}   "
+                      f"UNINFORMATIVE, clipped at the patch boundary")
+                continue
             holds = a[key] > b[key]
             print(f"  {key:<12} {a[key]:>5} vs {b[key]:>5}   "
                   f"{'HOLDS' if holds else 'DOES NOT HOLD'}")
+        if clipped:
+            print("\n  Support equals the patch for every placement, so the"
+                  "\n  gradient reaches the whole input and the measure saturates."
+                  "\n  The theoretical field exceeds any patch this architecture"
+                  "\n  can train on, which makes that figure an unreachable bound"
+                  "\n  rather than merely a loose one. Compare the mass columns.")
         print("\n  Dominance requires more reach at lower cost. Cost is settled"
               "\n  by measurement in Section 7.1; if a reach column above does not"
               "\n  hold, the claim must be narrowed to the columns that do.")

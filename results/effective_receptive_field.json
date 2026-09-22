@@ -1,0 +1,66 @@
+[
+ {
+  "placement": "3-3-3-3",
+  "kernels": [
+   3,
+   3,
+   3,
+   3
+  ],
+  "theoretical": 151,
+  "support": 96,
+  "mass90": 59,
+  "mass50": 21,
+  "layers_retuned": 0,
+  "patch": 96,
+  "gpu": "NVIDIA GeForce RTX 3090"
+ },
+ {
+  "placement": "3-3-5-5",
+  "kernels": [
+   3,
+   3,
+   5,
+   5
+  ],
+  "theoretical": 271,
+  "support": 96,
+  "mass90": 70,
+  "mass50": 27,
+  "layers_retuned": 12,
+  "patch": 96,
+  "gpu": "NVIDIA GeForce RTX 3090"
+ },
+ {
+  "placement": "3-5-5-7",
+  "kernels": [
+   3,
+   5,
+   5,
+   7
+  ],
+  "theoretical": 371,
+  "support": 96,
+  "mass90": 73,
+  "mass50": 29,
+  "layers_retuned": 17,
+  "patch": 96,
+  "gpu": "NVIDIA GeForce RTX 3090"
+ },
+ {
+  "placement": "5-5-5-5",
+  "kernels": [
+   5,
+   5,
+   5,
+   5
+  ],
+  "theoretical": 301,
+  "support": 96,
+  "mass90": 67,
+  "mass50": 23,
+  "layers_retuned": 22,
+  "patch": 96,
+  "gpu": "NVIDIA GeForce RTX 3090"
+ }
+]
