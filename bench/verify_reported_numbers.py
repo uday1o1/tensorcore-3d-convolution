@@ -164,10 +164,21 @@ def main():
         print("note: receptive_field_cost absent, skipping placement claims\n")
 
     if pilot:
+        # Two formats exist: the original two-run output, with one spread and
+        # one p per class, and the N-run output, which reports every pairwise
+        # comparison. Read either, so extending the pilot does not silently
+        # stop the checks from running.
         for c in pilot.get("classes", {}).values():
-            computed[f"pilot, {c['name']} spread"] = c["spread"]
-            if c.get("paired_p") is not None:
-                computed[f"pilot, {c['name']} paired p"] = c["paired_p"]
+            name = c["name"]
+            if "pairs" in c:
+                computed[f"pilot, {name} spread"] = c["worst_spread"]
+                ps = [r["p"] for r in c["pairs"] if r.get("p") is not None]
+                if ps:
+                    computed[f"pilot, {name} paired p"] = min(ps)
+            else:
+                computed[f"pilot, {name} spread"] = c["spread"]
+                if c.get("paired_p") is not None:
+                    computed[f"pilot, {name} paired p"] = c["paired_p"]
     else:
         for k in list(CLAIMED):
             if k.startswith("pilot,"):

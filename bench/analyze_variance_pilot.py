@@ -1,38 +1,38 @@
-"""Is the kernel-placement comparison measurable at this budget?
+"""How much of a measured architectural difference is just the seed?
 
-Two identically configured MedNeXt-B kernel-3 runs differ only in random seed.
-The spread between them is the noise floor of this training setup, and any claim
-that one kernel placement beats another has to clear it.
+Takes two or more training runs of one identical configuration, differing only
+in random seed, and reports every pairwise comparison between them. The spread
+is the noise floor of this training setup: any claim that one architecture beats
+another has to clear it.
 
 The threshold is not arbitrary. MedNeXt reports uniform kernel 5 with UpKern
 improving mean Dice by roughly 0.2 points over kernel 3 (84.03 to 84.23 on BTCV,
 86.71 to 87.06 on AMOS22). That is the size of the effect a placement study
-chases, so if two identical runs differ by more than that, single-run
-comparisons between placements cannot be interpreted.
+chases.
+
+WHY EVERY PAIR, NOT JUST ONE. With two runs there is a single comparison, which
+can show that a false positive is possible but not how often it occurs, and an
+unlucky draw is the obvious objection. Three runs give three comparisons and a
+rate.
 
 WHICH NUMBER TO COMPARE. nnU-Net logs an "Average global foreground Dice" every
 epoch, computed on training-time validation batches. It is extremely noisy: in
-one of our runs consecutive epochs gave tumour Dice of 0.79, 0.63, 0.74, 0.79,
-0.50, 0.84. That figure is a training diagnostic, not a result, and an earlier
-version of this script compared it, which would have declared the study
-impossible on the strength of the wrong quantity. The result is the per-case
-Dice in validation_raw/summary.json, produced after training by a full sliding
-window inference over every validation case.
+one run consecutive epochs gave tumour Dice of 0.79, 0.63, 0.74, 0.79, 0.50,
+0.84. That is a training diagnostic, not a result, and an earlier version of
+this script compared it, which would have declared the study impossible on the
+strength of the wrong quantity. The result is the per-case Dice in
+validation_raw/summary.json, written after training by full sliding window
+inference over every validation case.
 
-Having per-case values for both runs also permits a paired test over cases
-rather than a difference of two means, which is what the project proposal
-specified and which is the stronger comparison.
-
-Outcomes:
-  GO        spread well below the effect; single runs per placement suffice
-  MARGINAL  spread comparable to the effect; placements need repeats
-  NO GO     spread exceeds the effect; the accuracy axis is not measurable at
-            this budget, and the cost-side result stands on its own instead
+Per-case values also permit a paired signed-rank test over cases, which is the
+test this project's proposal specified, and which is the point: run against a
+known null, it should not find anything.
 
 Usage:
-  python analyze_variance_pilot.py <summary1.json> <summary2.json>
-  python analyze_variance_pilot.py           # uses the two pilot trainer paths
+  python analyze_variance_pilot.py <summary1.json> <summary2.json> [more...]
+  python analyze_variance_pilot.py          # all pilot seeds present on disk
 """
+import itertools
 import json
 import math
 import statistics as st
@@ -43,15 +43,20 @@ ROOT = Path(__file__).resolve().parent.parent
 
 # MedNeXt's reported gain for uniform kernel 5 over kernel 3, on a 0-1 scale.
 TARGET_EFFECT = 0.002
+ALPHA = 0.05
 
 RESULTS = Path("/workspace/RESULTS_FOLDER/nnUNet/3d_fullres/Task003_Liver")
-DEFAULTS = [
-    RESULTS / "nnUNetTrainerV2_MedNeXt_B_k3_150ep_s1__nnUNetPlansv2.1_trgSp_1x1x1"
-            / "fold_0" / "validation_raw" / "summary.json",
-    RESULTS / "nnUNetTrainerV2_MedNeXt_B_k3_150ep_s2__nnUNetPlansv2.1_trgSp_1x1x1"
-            / "fold_0" / "validation_raw" / "summary.json",
-]
+TRAINER = "nnUNetTrainerV2_MedNeXt_B_k3_150ep_s{}__nnUNetPlansv2.1_trgSp_1x1x1"
 CLASS_NAMES = {"1": "liver", "2": "tumor"}
+
+
+def default_paths():
+    out = []
+    for seed in (1, 2, 3, 4, 5):
+        p = RESULTS / TRAINER.format(seed) / "fold_0" / "validation_raw" / "summary.json"
+        if p.exists():
+            out.append(p)
+    return out
 
 
 def per_case(path):
@@ -60,25 +65,25 @@ def per_case(path):
     out = {}
     for case in d["results"]["all"]:
         ref = case.get("reference") or case.get("test") or ""
-        key = Path(str(ref)).name
-        out[key] = {k: v["Dice"] for k, v in case.items()
-                    if k.isdigit() and isinstance(v, dict) and "Dice" in v}
+        out[Path(str(ref)).name] = {
+            k: v["Dice"] for k, v in case.items()
+            if k.isdigit() and isinstance(v, dict) and "Dice" in v}
     return out
 
 
 def wilcoxon_signed_rank(diffs):
     """Two-sided Wilcoxon signed-rank p, normal approximation.
 
-    Returns None when too few nonzero differences for the approximation to
-    mean anything, rather than returning a number that looks like evidence.
+    Returns None when too few nonzero differences for the approximation to mean
+    anything, rather than a number that would look like evidence.
     """
     nz = [d for d in diffs if d != 0 and not math.isnan(d)]
     n = len(nz)
     if n < 6:
         return None
-    ranked = sorted(range(n), key=lambda i: abs(nz[i]))
+    order = sorted(range(n), key=lambda i: abs(nz[i]))
     ranks = [0.0] * n
-    for pos, i in enumerate(ranked, start=1):
+    for pos, i in enumerate(order, start=1):
         ranks[i] = float(pos)
     w_plus = sum(ranks[i] for i in range(n) if nz[i] > 0)
     mean = n * (n + 1) / 4
@@ -86,97 +91,117 @@ def wilcoxon_signed_rank(diffs):
     if sd == 0:
         return None
     z = (w_plus - mean) / sd
-    # two-sided normal tail
     return 2 * (1 - 0.5 * (1 + math.erf(abs(z) / math.sqrt(2))))
 
 
+def compare(run_a, run_b, cls):
+    """Paired comparison on one class, dropping cases where it is absent.
+
+    A class Dice is NaN for cases that do not contain that class, and those
+    cases carry no information about it. Coercing them to zero would drag both
+    means down and shrink the apparent spread, making the noise floor look
+    smaller than it is.
+    """
+    shared = sorted(set(run_a) & set(run_b))
+    usable = [k for k in shared
+              if cls in run_a[k] and cls in run_b[k]
+              and not math.isnan(run_a[k][cls]) and not math.isnan(run_b[k][cls])]
+    if len(usable) < 2:
+        return None
+    a = [run_a[k][cls] for k in usable]
+    b = [run_b[k][cls] for k in usable]
+    diffs = [x - y for x, y in zip(a, b)]
+    return {"n": len(usable), "dropped": len(shared) - len(usable),
+            "mean_a": st.mean(a), "mean_b": st.mean(b),
+            "spread": abs(st.mean(a) - st.mean(b)),
+            "sd": st.stdev(diffs) if len(diffs) > 1 else 0.0,
+            "p": wilcoxon_signed_rank(diffs)}
+
+
 def main(argv):
-    paths = [Path(p) for p in argv[1:3]] or DEFAULTS
+    paths = [Path(p) for p in argv[1:]] or default_paths()
+    if len(paths) < 2:
+        print(f"need at least two run summaries, found {len(paths)}")
+        for p in paths:
+            print(f"  {p}")
+        print("\nTraining AND validation must finish for each seed. The")
+        print("per-epoch Dice in the training log is a diagnostic, not a result.")
+        return 1
     missing = [p for p in paths if not p.exists()]
     if missing:
-        print("missing validation summaries:")
         for m in missing:
-            print(f"  {m}")
-        print("\nBoth pilot seeds must finish training AND validation first.")
-        print("The per-epoch Dice in the training log is a diagnostic, not a")
-        print("result, and must not be substituted for these.")
+            print(f"missing: {m}")
         return 1
 
     runs = [per_case(p) for p in paths]
-    shared = sorted(set(runs[0]) & set(runs[1]))
-    if not shared:
-        print("the two runs share no validation cases; not comparable")
-        return 1
-    classes = sorted({c for r in runs for v in r.values() for c in v}
-                     - {"0"})
+    labels = []
+    for i, p in enumerate(paths):
+        parent = p.parts[-4]
+        labels.append(parent.split("_s")[-1].split("__")[0] if "_s" in parent
+                      else str(i + 1))
+    classes = sorted({c for r in runs for v in r.values() for c in v} - {"0"})
+    pairs = list(itertools.combinations(range(len(runs)), 2))
 
-    print(f"comparing {len(shared)} shared validation cases\n")
-    print(f"{'class':<10}{'seed 1':>10}{'seed 2':>10}{'spread':>10}"
-          f"{'per-case sd':>13}{'paired p':>10}")
-    spreads = []
-    report = {}
-    for c in classes:
-        # A class Dice is NaN for cases that do not contain that class. Liver
-        # tumour is absent from some validation volumes, so those cases carry
-        # no information about this class and must be dropped rather than
-        # averaged. Keeping them crashes statistics.stdev, which is how this
-        # was found; silently coercing them to zero would have been worse,
-        # since it would drag both means toward zero and shrink the apparent
-        # spread, making the noise floor look smaller than it is.
-        usable = [k for k in shared
-                  if c in runs[0][k] and c in runs[1][k]
-                  and not math.isnan(runs[0][k][c]) and not math.isnan(runs[1][k][c])]
-        dropped = len(shared) - len(usable)
-        a = [runs[0][k][c] for k in usable]
-        b = [runs[1][k][c] for k in usable]
-        if len(a) < 2:
-            print(f"{CLASS_NAMES.get(c, c):<10}  only {len(a)} usable cases, skipped")
-            continue
-        ma, mb = st.mean(a), st.mean(b)
-        diffs = [x - y for x, y in zip(a, b)]
-        sd = st.stdev(diffs) if len(diffs) > 1 else 0.0
-        p = wilcoxon_signed_rank(diffs)
-        spreads.append(abs(ma - mb))
-        report[c] = {"name": CLASS_NAMES.get(c, c), "seed1": ma, "seed2": mb,
-                     "spread": abs(ma - mb), "per_case_sd": sd, "paired_p": p,
-                     "n_used": len(a), "n_dropped_absent_class": dropped}
-        ps = f"{p:.3f}" if p is not None else "n/a"
-        note = f"  ({len(a)} cases" + (f", {dropped} lack the class)" if dropped else ")")
-        print(f"{CLASS_NAMES.get(c, c):<10}{ma:>10.4f}{mb:>10.4f}"
-              f"{abs(ma-mb):>10.4f}{sd:>13.4f}{ps:>10}{note}")
-
-    worst = max(spreads) if spreads else 0.0
-    mean_spread = st.mean(spreads) if spreads else 0.0
-    print(f"\nmean spread {mean_spread:.4f}, worst class {worst:.4f}")
+    print(f"{len(runs)} runs of one identical configuration, "
+          f"{len(pairs)} pairwise comparisons")
     print(f"effect being chased {TARGET_EFFECT:.4f} "
-          f"(MedNeXt's kernel 5 gain over kernel 3, 0.2 Dice points)")
+          f"(0.2 Dice points, MedNeXt's kernel 5 gain over kernel 3)\n")
 
-    if worst < TARGET_EFFECT / 2:
-        verdict = "GO"
-        note = "spread is well under the effect; one run per placement is interpretable"
-    elif worst < TARGET_EFFECT * 1.5:
-        verdict = "MARGINAL"
-        note = ("spread is comparable to the effect; placements need repeats, "
-                "not more configurations")
+    report = {}
+    for cls in classes:
+        name = CLASS_NAMES.get(cls, cls)
+        print(f"{name}")
+        print(f"  {'pair':<10}{'mean A':>9}{'mean B':>9}{'spread':>9}"
+              f"{'sd':>9}{'paired p':>10}{'n':>5}")
+        rows = []
+        for i, j in pairs:
+            r = compare(runs[i], runs[j], cls)
+            if r is None:
+                continue
+            r["pair"] = f"s{labels[i]}/s{labels[j]}"
+            rows.append(r)
+            ps = f"{r['p']:.3f}" if r["p"] is not None else "n/a"
+            flag = "  <- significant" if (r["p"] is not None and r["p"] < ALPHA) else ""
+            print(f"  {r['pair']:<10}{r['mean_a']:>9.4f}{r['mean_b']:>9.4f}"
+                  f"{r['spread']:>9.4f}{r['sd']:>9.4f}{ps:>10}{r['n']:>5}{flag}")
+        if not rows:
+            continue
+        spreads = [r["spread"] for r in rows]
+        sig = [r for r in rows if r["p"] is not None and r["p"] < ALPHA]
+        worst = max(spreads)
+        print(f"  spread: min {min(spreads):.4f}, max {worst:.4f}, "
+              f"vs effect {TARGET_EFFECT:.4f} ({worst/TARGET_EFFECT:.0f}x)")
+        print(f"  false positives: {len(sig)}/{len(rows)} comparisons reach "
+              f"p < {ALPHA} between IDENTICAL configurations")
+        if worst > 0:
+            need = max(1, round((worst / TARGET_EFFECT) ** 2))
+            print(f"  runs per configuration needed to resolve the effect: ~{need}")
+        report[cls] = {"name": name, "pairs": rows, "worst_spread": worst,
+                       "min_spread": min(spreads), "n_significant": len(sig),
+                       "n_comparisons": len(rows)}
+        print()
+
+    worst_overall = max((v["worst_spread"] for v in report.values()), default=0.0)
+    total_sig = sum(v["n_significant"] for v in report.values())
+    total_cmp = sum(v["n_comparisons"] for v in report.values())
+
+    if worst_overall < TARGET_EFFECT / 2:
+        verdict, note = "GO", "spread is well under the effect; single runs are interpretable"
+    elif worst_overall < TARGET_EFFECT * 1.5:
+        verdict, note = "MARGINAL", "spread is comparable to the effect; repeats are required"
     else:
-        verdict = "NO GO"
-        note = ("spread exceeds the effect. The accuracy axis is not measurable "
-                "at this budget on this task. Report the cost-side dominance "
-                "result, which requires no training, and state plainly why the "
-                "accuracy comparison is not attempted")
-    print(f"\nVERDICT: {verdict}\n  {note}")
+        verdict, note = "NO GO", ("spread exceeds the effect. The accuracy axis is not "
+                                  "measurable at this budget, and the cost-side result "
+                                  "stands on its own instead")
+    print(f"VERDICT: {verdict}\n  {note}")
+    print(f"  across all classes, {total_sig} of {total_cmp} paired tests between "
+          f"identical configurations reached p < {ALPHA}")
 
-    if verdict != "GO" and spreads:
-        tight = min(spreads)
-        print(f"\n  The tightest class has spread {tight:.4f}. Resolving "
-              f"{TARGET_EFFECT:.4f} at that noise level needs roughly "
-              f"{max(1, round((tight / TARGET_EFFECT) ** 2))} runs per placement.")
-
-    json.dump({"summaries": [str(p) for p in paths], "classes": report,
-               "mean_spread": mean_spread, "worst_spread": worst,
-               "target_effect": TARGET_EFFECT, "verdict": verdict},
+    json.dump({"summaries": [str(p) for p in paths], "n_runs": len(runs),
+               "classes": report, "worst_spread": worst_overall,
+               "target_effect": TARGET_EFFECT, "verdict": verdict,
+               "n_significant": total_sig, "n_comparisons": total_cmp},
               open(ROOT / "results" / "variance_pilot.json", "w"), indent=1)
-    print(f"\nwrote {ROOT / 'results' / 'variance_pilot.json'}")
     return 0
 
 
