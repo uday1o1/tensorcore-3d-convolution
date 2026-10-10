@@ -59,10 +59,10 @@ need_space() {
 }
 
 # The archive host serves one connection at a few MB/s and a single stream
-# was seen to stall outright, so fetch byte ranges in parallel. A part already
-# at its full size is kept, so rerunning resumes.
+# was seen to stall outright, so fetch byte ranges in parallel. Parts keep
+# what they have, so a rerun resumes.
 download_parallel() {
-  local url="$1" out="$2" n=16 size chunk i s e want part pids=()
+  local url="$1" out="$2" n=16 size chunk i s e want part have pids=()
   size=$(curl -sIL "$url" | tr -d '\r' | awk 'tolower($1)=="content-length:" {v=$2} END {print v}')
   [ -n "$size" ] || { say "could not read archive size"; return 1; }
   [ -f "$out" ] && [ "$(stat -c%s "$out")" = "$size" ] && return 0
@@ -71,10 +71,14 @@ download_parallel() {
     s=$((i * chunk)); e=$(( (i + 1) * chunk - 1 )); [ "$e" -ge "$size" ] && e=$((size - 1))
     part="$out.part$i"; want=$((e - s + 1))
     [ -f "$part" ] && [ "$(stat -c%s "$part")" = "$want" ] && continue
-    ( for try in 1 2 3 4 5; do
-        curl -sS -L --speed-limit 100000 --speed-time 60 -r "$s-$e" -o "$part" "$url" \
-          && [ "$(stat -c%s "$part")" = "$want" ] && exit 0
-        sleep 5
+    # Connections stall rather than fail, so a stalled one is dropped and the
+    # part resumes from the bytes it already has instead of starting over.
+    ( for try in $(seq 1 50); do
+        have=$( [ -f "$part" ] && stat -c%s "$part" || echo 0 )
+        [ "$have" -eq "$want" ] && exit 0
+        [ "$have" -gt "$want" ] && { rm -f "$part"; have=0; }
+        curl -sS -L --speed-limit 100000 --speed-time 30 -r "$((s + have))-$e" "$url" >> "$part"
+        sleep 2
       done; exit 1 ) &
     pids+=($!)
   done
