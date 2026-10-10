@@ -38,6 +38,10 @@ export nnUNet_raw_data_base="$WORK/nnUNet_raw_data_base"
 export nnUNet_preprocessed="$WORK/nnUNet_preprocessed"
 export RESULTS_FOLDER="$WORK/RESULTS_FOLDER"
 export BENCH_RESULTS_DIR="$WORK/bench_results"
+# Evaluation loads full-resolution predictions and labels in parallel. With
+# nnU-Net's default of 8 workers it reached 64 GB on a 64 GB host and the run
+# was killed after all predictions were written, before any score was saved.
+export nnUNet_def_n_proc=2
 export PYTHONPATH="$REPO/src\${PYTHONPATH:+:\$PYTHONPATH}"
 EOF
   mkdir -p "$WORK/nnUNet_raw_data_base" "$WORK/nnUNet_preprocessed" \
@@ -190,13 +194,27 @@ cmd_setup() {
 
 cmd_train() {
   local trainer="$1"
+  write_env
   load_env
   stage_trainers
   local out="$RESULTS_FOLDER/nnUNet/3d_fullres/Task003_Liver/${trainer}__${PLANS}/fold_0"
   local src="$RESULTS_FOLDER/nnUNet/3d_fullres/Task003_Liver/nnUNetTrainerV2_MedNeXt_B_k3_150ep_s1__${PLANS}/fold_0/model_final_checkpoint.model"
   export MEDNEXT_UPKERN_SOURCE="${MEDNEXT_UPKERN_SOURCE:-$src}"
-  say "training $trainer"
-  mednextv1_train 3d_fullres "$trainer" Task003_Liver 0 --use_compressed_data -p "$PLANS"
+  # Resume rather than repeat: a finished run missing its scores is only
+  # re-evaluated, reusing its predictions, and an interrupted run continues
+  # from its latest checkpoint.
+  local resume=()
+  if [ -f "$out/validation_raw/summary.json" ]; then
+    say "already evaluated $trainer"
+  elif [ -f "$out/model_final_checkpoint.model" ]; then
+    resume=(--validation_only --val_disable_overwrite); say "evaluating $trainer"
+  elif [ -f "$out/model_latest.model" ]; then
+    resume=(-c); say "continuing $trainer"
+  else
+    say "training $trainer"
+  fi
+  [ -f "$out/validation_raw/summary.json" ] || \
+    mednextv1_train 3d_fullres "$trainer" Task003_Liver 0 --use_compressed_data -p "$PLANS" "${resume[@]}"
   local rc=$?
   # The per-case validation summary is small and is the raw input to every
   # accuracy claim. Copy it out of the run directory immediately: when an
