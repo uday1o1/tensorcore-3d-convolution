@@ -134,9 +134,9 @@ Task03 Liver, and runs a smoke test, detached and resumable stage by stage. It
 is the only file in the repository that knows anything about the instance
 layout; it writes `env.sh`, which sets `BENCH_RESULTS_DIR` outside the checkout
 so fresh results never block `git pull`. Without that variable, output goes to
-`results/`. `scripts/setup_vast.sh launch train <Trainer>` trains one
-configuration and copies its per-case validation summary out of the run
-directory as soon as it finishes.
+`results/`. `scripts/setup_vast.sh launch train <Trainer> ...` trains
+configurations in sequence and copies each per-case validation summary out of
+the run directory as soon as it finishes.
 
 cuDNN shows real run to run variance on this hardware, so all results are
 medians of repeated trials, taken against the cuDNN figure most favorable to

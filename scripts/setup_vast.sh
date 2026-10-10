@@ -6,7 +6,7 @@
 # variables, so it runs unchanged on any machine.
 #
 #   scripts/setup_vast.sh launch setup          provision, detached, resumable
-#   scripts/setup_vast.sh launch train <Trainer> train one nnU-Net trainer, detached
+#   scripts/setup_vast.sh launch train <T> [<T> ...]  train in sequence, detached
 #   scripts/setup_vast.sh status                 what has finished, what is running
 #   source "$WORK/env.sh"                        environment for running anything
 #
@@ -197,7 +197,11 @@ case "${1:-}" in
     echo "launched: $* (log $log)"
     ;;
   setup) cmd_setup ;;
-  train) [ -n "${2:-}" ] || { echo "usage: $0 train <Trainer>"; exit 2; }; cmd_train "$2" ;;
+  train)
+    # A failed run is reported and the sequence moves on, so one bad
+    # configuration does not idle the GPU for the rest of the queue.
+    [ -n "${2:-}" ] || { echo "usage: $0 train <Trainer> [<Trainer> ...]"; exit 2; }
+    shift; for t in "$@"; do cmd_train "$t"; done; say "QUEUE DONE" ;;
   status) cmd_status ;;
   *) sed -n '2,20p' "$0"; exit 2 ;;
 esac
