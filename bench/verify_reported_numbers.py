@@ -33,6 +33,10 @@ ROOT = Path(__file__).resolve().parent.parent
 # relative tolerance, since the prose quotes them to a couple of significant
 # figures and the data carries full precision.
 COUNTS = {
+    "audit, 3090 session winner changes", "audit, 4090 session winner changes",
+    "audit, cross-host winner changes, one session",
+    "audit, cross-host winner changes, session-confirmed",
+    "audit, 3090 rule 2 confirmed by both sessions",
     "dense configurations won", "depthwise configurations won",
     "wins at k>=9", "wins at C>=240 and k>=5",
     "held out, rule agreements out of 32",
@@ -66,6 +70,14 @@ CLAIMED = {
     "pilot, tumor spread": 0.0407,
     "pilot, liver spread": 0.0005,
     "pilot, tumor paired p": 0.049,
+    # Measurement audit: two sessions per host, one host per GPU
+    "audit, 3090 session winner changes": 4,
+    "audit, 4090 session winner changes": 2,
+    "audit, 3090 session median offset": 0.990,
+    "audit, 4090 session median offset": 0.998,
+    "audit, cross-host winner changes, one session": 17,
+    "audit, cross-host winner changes, session-confirmed": 13,
+    "audit, 3090 rule 2 confirmed by both sessions": 10,
 }
 
 
@@ -184,6 +196,33 @@ def main():
             if k.startswith("pilot,"):
                 CLAIMED.pop(k)
         print("note: variance_pilot absent, skipping pilot claims\n")
+
+    try:
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        from compare_devices import load, session_agreement
+        ag = session_agreement(load("crossover_map"), load("training_crossover"))
+    except Exception as e:
+        ag = {}
+        print(f"note: session agreement unavailable ({type(e).__name__})\n")
+    if "rtx3090" in ag and "rtx4090" in ag:
+        a3, a4 = ag["rtx3090"], ag["rtx4090"]
+        cells = sorted(set(a3["cells"]) & set(a4["cells"]))
+        computed["audit, 3090 session winner changes"] = len(a3["disagree"])
+        computed["audit, 4090 session winner changes"] = len(a4["disagree"])
+        computed["audit, 3090 session median offset"] = a3["median_offset"]
+        computed["audit, 4090 session median offset"] = a4["median_offset"]
+        computed["audit, cross-host winner changes, one session"] = sum(
+            (a3["cm"][k] > 1) != (a4["cm"][k] > 1) for k in cells)
+        computed["audit, cross-host winner changes, session-confirmed"] = sum(
+            a3["verdicts"][k] is not None and a4["verdicts"][k] is not None
+            and a3["verdicts"][k] != a4["verdicts"][k] for k in cells)
+        computed["audit, 3090 rule 2 confirmed by both sessions"] = sum(
+            a3["cm"][k] > 1 and a3["tc"][k] > 1 for k in a3["cells"]
+            if k[0] >= 240 and k[2] >= 5)
+    else:
+        for k in list(CLAIMED):
+            if k.startswith("audit,"):
+                CLAIMED.pop(k)
 
     print(f"crossover grid: {len(dense)} dense, {len(depth)} depthwise, "
           f"{dense[0].get('trials','?')} trials each")

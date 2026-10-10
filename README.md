@@ -47,10 +47,12 @@ rule reading only layer shape lands within 2.1% of a per-shape oracle against
 
 That rule then fails in two ways worth reporting. On a whole network at kernel
 size 9 it regresses to 0.819x where an autotuner reaches 1.025x. And on a second
-GPU architecture, 17 of 60 configurations change winner, the clause that looked
-strongest on Ampere is dead on Ada, and the rule's advantage over simply calling
-cuDNN falls from 8.25% to 0.01%. The method's niche narrows as compute-to-
-bandwidth rises, which is the direction hardware moves.
+machine, an RTX 4090 host against the RTX 3090 host, 13 of 60 configurations
+change winner even counting only cells that two independent sessions on each
+host agree on, the clause that looked strongest on the first machine is dead on
+the second, and the rule's advantage over simply calling cuDNN falls from 8.25%
+to 0.01%. With one host per GPU this cannot separate the GPU generation from the
+host, so it is reported as a difference between two machines.
 
 **Part II, kernel placement.** Given that the cost is close to fixed, the
 question is where to spend it, and the thing worth buying is receptive field.
@@ -114,8 +116,21 @@ the checkpoint is produced by training `src/trainers/nnUNetTrainerV2_150ep.py`.
 **Environment.** Measured on NVIDIA RTX 3090 (24GB), sm_86, CUDA 12.8, PyTorch
 2.11.0+cu128, Python 3.12.14, cuDNN 9.19.0. The GPU class matters: it is the
 same one used in Im2win's own published evaluation, which is what makes the
-reproduction comparable. Every result currently in `results/` was measured on a
-single host, driver 595.71.05, so no number is compared across machines.
+reproduction comparable. Results tagged `rtx3090` come from one RTX 3090 host
+(driver 595.71.05) and results tagged `rtx4090` from one RTX 4090 host (driver
+570.144), with PyTorch and cuDNN pinned to the same versions on both. One host
+per GPU means cross-device comparisons cannot separate GPU from host.
+
+Two sessions of the same convolutions on the same host can disagree. On the RTX
+3090 host, 4 of 60 cells change winner between sessions, so single cells near
+parity should not be read as settled; `bench/compare_devices.py` reports which
+cells two sessions agree on. The benchmarks now alternate which algorithm is
+timed first, discard warm-up calls, and record driver, power limit, clocks and
+host processor with every row.
+
+**Running on a rented instance.** Set `BENCH_RESULTS_DIR` to a directory outside
+the checkout so fresh results do not block `git pull`, then copy back what you
+want to commit. Without it, output goes to `results/`.
 
 cuDNN shows real run to run variance on this hardware, so all results are
 medians of repeated trials, taken against the cuDNN figure most favorable to

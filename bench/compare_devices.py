@@ -91,6 +91,38 @@ def smallest_crossing(rows, key="ratio"):
     return (st.median(firsts) if firsts else None), len(firsts), len(shapes)
 
 
+def session_agreement(maps, trains):
+    """Do two independent sessions on the same host agree on each winner?
+
+    Each device's forward convolutions were measured twice: once in the
+    crossover sweep, interleaved, and once in the training sweep, in blocks.
+    Same shapes, same host, different session and ordering. Within-session
+    trial spread cannot reveal session-to-session variation, since a
+    consistently biased session is also consistent. Agreement between the two
+    sessions can.
+
+    Returns per-device verdicts: True or False where both sessions agree on
+    the winner, None where they disagree.
+    """
+    out = {}
+    for tag in maps:
+        if tag not in trains:
+            continue
+        cm = {(r["C"], r["sp"], r["k"]): r["ratio"] for r in maps[tag]
+              if r.get("mode", "dense") == "dense"}
+        tc = {(r["C"], r["sp"], r["k"]): r["fwd_ratio"] for r in trains[tag]}
+        cells = sorted(set(cm) & set(tc))
+        logd = [math.log(tc[k] / cm[k]) for k in cells]
+        verdicts = {k: ((cm[k] > 1) if (cm[k] > 1) == (tc[k] > 1) else None)
+                    for k in cells}
+        out[tag] = {"cells": cells, "cm": cm, "tc": tc, "verdicts": verdicts,
+                    "median_offset": math.exp(st.median(logd)),
+                    "abs_dev_median": st.median([abs(v) for v in logd]),
+                    "abs_dev_p90": sorted(abs(v) for v in logd)[int(0.9 * len(logd))],
+                    "disagree": [k for k in cells if verdicts[k] is None]}
+    return out
+
+
 def main():
     maps = load("crossover_map")
     if len(maps) < 2:
@@ -183,6 +215,44 @@ def main():
               "\n  more at 240 channels, which is where the rule selects, and the"
               "\n  windowed path gains more at 120 channels, which is where cells"
               "\n  flip toward it.")
+
+    # Session agreement: the measure that within-session spread cannot give.
+    trains_all = load("training_crossover")
+    agree = session_agreement(maps, trains_all)
+    if agree:
+        print("\nSESSION AGREEMENT, same host, same convolutions, two sessions")
+        print(f"  {'device':<10}{'offset':>9}{'median dev':>12}{'p90 dev':>9}"
+              f"{'winner changes':>16}")
+        for tag, a in agree.items():
+            print(f"  {tag:<10}{a['median_offset']:>9.3f}{a['abs_dev_median']:>12.3f}"
+                  f"{a['abs_dev_p90']:>9.3f}{len(a['disagree']):>12}/{len(a['cells'])}")
+            for k in a["disagree"]:
+                print(f"      C{k[0]} sp{k[1]} k{k[2]}: {a['cm'][k]:.2f} in one session, "
+                      f"{a['tc'][k]:.2f} in the other")
+        tags = list(agree)
+        if len(tags) >= 2:
+            x, y = agree[tags[0]], agree[tags[1]]
+            cells = sorted(set(x["cells"]) & set(y["cells"]))
+            naive = [k for k in cells if (x["cm"][k] > 1) != (y["cm"][k] > 1)]
+            robust = [k for k in cells if x["verdicts"][k] is not None
+                      and y["verdicts"][k] is not None
+                      and x["verdicts"][k] != y["verdicts"][k]]
+            print(f"\n  cross-device winner changes, one session per device: "
+                  f"{len(naive)}/{len(cells)}")
+            print(f"  ...counting only cells both sessions agree on, on both: "
+                  f"{len(robust)}/{len(cells)}")
+            print("  One host per GPU, so these are differences between two hosts;"
+                  "\n  the GPU and the host cannot be separated with this data.")
+        for tag, a in agree.items():
+            r2 = [k for k in a["cells"] if k[0] >= 240 and k[2] >= 5]
+            k3 = [k for k in a["cells"] if k[2] == 3]
+            print(f"\n  {tag}: rule 1 (k=3 never wins), wins in either session: "
+                  f"{sum(a['cm'][k] > 1 or a['tc'][k] > 1 for k in k3)}/{len(k3)}")
+            print(f"  {tag}: rule 2 (C>=240, k>=5), wins in both sessions: "
+                  f"{sum(a['cm'][k] > 1 and a['tc'][k] > 1 for k in r2)}/{len(r2)}")
+            print(f"  {tag}: dense wins, crossover sweep "
+                  f"{sum(a['cm'][k] > 1 for k in a['cells'])}, confirmed by both "
+                  f"sessions {sum(a['cm'][k] > 1 and a['tc'][k] > 1 for k in a['cells'])}")
 
     # The claim that matters most, and the one we made no prediction about.
     trains = load("training_crossover")
