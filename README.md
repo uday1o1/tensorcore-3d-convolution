@@ -128,9 +128,15 @@ cells two sessions agree on. The benchmarks now alternate which algorithm is
 timed first, discard warm-up calls, and record driver, power limit, clocks and
 host processor with every row.
 
-**Running on a rented instance.** Set `BENCH_RESULTS_DIR` to a directory outside
-the checkout so fresh results do not block `git pull`, then copy back what you
-want to commit. Without it, output goes to `results/`.
+**Running on a rented instance.** `scripts/setup_vast.sh launch setup` installs
+the pinned PyTorch build and the MedNeXt fork, downloads and preprocesses MSD
+Task03 Liver, and runs a smoke test, detached and resumable stage by stage. It
+is the only file in the repository that knows anything about the instance
+layout; it writes `env.sh`, which sets `BENCH_RESULTS_DIR` outside the checkout
+so fresh results never block `git pull`. Without that variable, output goes to
+`results/`. `scripts/setup_vast.sh launch train <Trainer>` trains one
+configuration and copies its per-case validation summary out of the run
+directory as soon as it finishes.
 
 cuDNN shows real run to run variance on this hardware, so all results are
 medians of repeated trials, taken against the cuDNN figure most favorable to

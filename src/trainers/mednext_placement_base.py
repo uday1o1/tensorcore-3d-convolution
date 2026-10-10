@@ -37,6 +37,11 @@ class MedNeXtPlacementTrainer(nnUNetTrainerV2_MedNeXt_B_kernel3):
     """MedNeXt-B with per-stage depthwise kernels, UpKern initialized."""
 
     KERNELS = [3, 3, 3, 3]
+    # UpKern is the default because MedNeXt reports large kernels failing from
+    # scratch. A subclass may set this False, deliberately, to test whether
+    # that holds when large kernels are confined to deep stages. The refusal
+    # below guards against falling back to scratch by accident, not on purpose.
+    UPKERN = True
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -66,6 +71,12 @@ class MedNeXtPlacementTrainer(nnUNetTrainerV2_MedNeXt_B_kernel3):
         self.print_to_log_file(
             f"placement {'-'.join(map(str, self.KERNELS))}: retuned {changed} "
             f"depthwise layers, blocks per stage {counts}, receptive field {rf} voxels")
+
+        if not self.UPKERN:
+            self.print_to_log_file(
+                f"placement {'-'.join(map(str, self.KERNELS))}: trained FROM SCRATCH "
+                "by design (UPKERN = False), the training strategy ablation")
+            return
 
         src = os.environ.get("MEDNEXT_UPKERN_SOURCE")
         if not src or not Path(src).exists():
