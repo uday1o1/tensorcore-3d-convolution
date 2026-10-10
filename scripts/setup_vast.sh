@@ -42,6 +42,10 @@ export BENCH_RESULTS_DIR="$WORK/bench_results"
 # nnU-Net's default of 8 workers it reached 64 GB on a 64 GB host and the run
 # was killed after all predictions were written, before any score was saved.
 export nnUNet_def_n_proc=2
+# nnU-Net loads its own checkpoints with a bare torch.load, which torch 2.6+
+# refuses for these files; this only applies where the caller left
+# weights_only unset, and the checkpoints are ones this run wrote.
+export TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD=1
 export PYTHONPATH="$REPO/src\${PYTHONPATH:+:\$PYTHONPATH}"
 EOF
   mkdir -p "$WORK/nnUNet_raw_data_base" "$WORK/nnUNet_preprocessed" \
