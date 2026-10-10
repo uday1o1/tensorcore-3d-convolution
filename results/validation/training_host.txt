@@ -1,0 +1,4 @@
+name, driver_version, power.limit [W], power.default_limit [W], clocks.max.sm [MHz]
+NVIDIA GeForce RTX 3090, 580.126.09, 320.00 W, 420.00 W, 2130 MHz
+model name	: AMD Ryzen 9 5950X 16-Core Processor
+torch 2.11.0+cu128 cudnn 91900
