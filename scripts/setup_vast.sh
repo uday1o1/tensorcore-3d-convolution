@@ -58,6 +58,31 @@ need_space() {
   fi
 }
 
+# The archive host serves one connection at a few MB/s and a single stream
+# was seen to stall outright, so fetch byte ranges in parallel. A part already
+# at its full size is kept, so rerunning resumes.
+download_parallel() {
+  local url="$1" out="$2" n=16 size chunk i s e want part pids=()
+  size=$(curl -sIL "$url" | tr -d '\r' | awk 'tolower($1)=="content-length:" {v=$2} END {print v}')
+  [ -n "$size" ] || { say "could not read archive size"; return 1; }
+  [ -f "$out" ] && [ "$(stat -c%s "$out")" = "$size" ] && return 0
+  chunk=$(( (size + n - 1) / n ))
+  for i in $(seq 0 $((n - 1))); do
+    s=$((i * chunk)); e=$(( (i + 1) * chunk - 1 )); [ "$e" -ge "$size" ] && e=$((size - 1))
+    part="$out.part$i"; want=$((e - s + 1))
+    [ -f "$part" ] && [ "$(stat -c%s "$part")" = "$want" ] && continue
+    ( for try in 1 2 3 4 5; do
+        curl -sS -L --speed-limit 100000 --speed-time 60 -r "$s-$e" -o "$part" "$url" \
+          && [ "$(stat -c%s "$part")" = "$want" ] && exit 0
+        sleep 5
+      done; exit 1 ) &
+    pids+=($!)
+  done
+  for i in "${pids[@]}"; do wait "$i" || return 1; done
+  for i in $(seq 0 $((n - 1))); do cat "$out.part$i"; done > "$out" && rm -f "$out".part*
+  [ "$(stat -c%s "$out")" = "$size" ]
+}
+
 stage_preflight() {
   done_stage preflight && return
   say "preflight"
@@ -107,7 +132,7 @@ stage_data() {
   if ! done_stage download; then
     say "downloading MSD Task03 Liver"
     need_space 60
-    curl -sS -L -C - --retry 5 -o "$raw/Task03_Liver.tar" "$TASK_TAR_URL" || exit 1
+    download_parallel "$TASK_TAR_URL" "$raw/Task03_Liver.tar" || exit 1
     finish_stage download
   fi
   if ! done_stage extract; then
