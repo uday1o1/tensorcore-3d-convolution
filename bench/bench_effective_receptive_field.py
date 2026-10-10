@@ -38,6 +38,7 @@ import torch.nn as nn
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))
+from benchenv import results_dir
 from kernel_placement import set_stage_kernels, receptive_field
 
 PLACEMENTS = {
@@ -146,7 +147,7 @@ def main():
 
     if not rows:
         return 1
-    json.dump(rows, open(ROOT / "results" / "effective_receptive_field.json", "w"),
+    json.dump(rows, open(results_dir() / "effective_receptive_field.json", "w"),
               indent=1)
 
     base = next(r for r in rows if r["placement"] == "3-3-3-3")

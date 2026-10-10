@@ -37,6 +37,7 @@ import torch.nn as nn
 # runs from anywhere in a fresh clone.
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))
+from benchenv import results_dir, device_meta
 from dispatch import convert
 
 from nnunet_mednext.network_architecture.generic_UNet import Generic_UNet
@@ -147,7 +148,7 @@ def run_one(k, patch):
         print(f"    {policy:9s} {c/results[policy][0]:5.3f}x")
     del ref, x
     torch.cuda.empty_cache()
-    out = {"k": k, "patch": patch, "eligible_layers": eligible}
+    out = {"k": k, "patch": patch, "eligible_layers": eligible, **device_meta()}
     for p, (dt, mem, chosen, rel) in results.items():
         out[p] = {"ms": dt * 1000, "peak_gb": mem, "windowed_layers": chosen,
                   "rel_err": rel, "speedup_vs_cudnn": c / dt}
@@ -169,7 +170,7 @@ def main(kernels):
             torch.cuda.empty_cache()
             print(f"  kernel size {k}: out of memory even at patch {p}")
 
-    json.dump(list(out.values()), open(ROOT / "results" / "dispatch_network.json", "w"), indent=1)
+    json.dump(list(out.values()), open(results_dir() / "dispatch_network.json", "w"), indent=1)
 
     print(f"\n{'='*66}\nVERDICT\n{'='*66}")
     for k, r in out.items():

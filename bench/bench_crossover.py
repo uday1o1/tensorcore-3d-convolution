@@ -32,6 +32,8 @@ import torch.nn.functional as F
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))
 from winconv import im2win_conv3d_minmat, im2win_conv3d_depthwise
+from benchenv import (results_dir, device_tag, device_meta, timed_pair,
+                      order_summary, discard_warmup)
 
 torch.backends.cudnn.benchmark = True
 
@@ -41,24 +43,6 @@ KERNELS = [3, 5, 7, 9, 11]
 BATCH = 2
 
 
-
-def device_tag():
-    """Short filesystem-safe name for the GPU, so multi-device runs coexist."""
-    name = torch.cuda.get_device_name(0)
-    return (name.replace("NVIDIA ", "").replace("GeForce ", "")
-                .replace(" ", "").replace("/", "-").lower())
-
-
-def device_meta():
-    """Everything needed to interpret a timing later."""
-    p = torch.cuda.get_device_properties(0)
-    return {"gpu": torch.cuda.get_device_name(0),
-            "capability": f"{p.major}.{p.minor}",
-            "sm_count": p.multi_processor_count,
-            "total_mem_gb": round(p.total_memory / 1e9, 1),
-            "torch": torch.__version__,
-            "cuda": torch.version.cuda,
-            "cudnn": torch.backends.cudnn.version()}
 
 
 def timeit(fn, n=8):
@@ -72,7 +56,7 @@ def timeit(fn, n=8):
     return (time.time() - t0) / n
 
 
-def sweep(mode, trials, rows):
+def sweep(mode, trials, rows, meta):
     """mode is 'dense' (groups=1) or 'depthwise' (groups=C)."""
     print(f'\n=== {mode} ===')
     print(f'{"C":>5}{"sp":>5}{"k":>4}{"out":>5}{"cuDNN_ms":>10}{"win_ms":>9}'
@@ -93,19 +77,22 @@ def sweep(mode, trials, rows):
                         w = torch.randn(C, 1, k, k, k, device="cuda", dtype=torch.half)
                         ref = lambda: F.conv3d(x, w, groups=C)
                         win = lambda: im2win_conv3d_depthwise(x, w)
-                    pairs = []
-                    for _ in range(trials):
-                        pairs.append((timeit(ref), timeit(win)))
-                    ratios = [a / b for a, b in pairs]
-                    tc = st.median([a for a, _ in pairs])
-                    tw = st.median([b for _, b in pairs])
-                    rows.append({**device_meta(), "mode": mode, "C": C, "sp": sp, "k": k, "out": out,
+                    # Order alternates by trial so a position effect cancels in
+                    # the median and is recorded rather than assumed absent.
+                    pairs = [timed_pair(ref, win, timeit, t) for t in range(trials)]
+                    ratios = [a / b for a, b, _ in pairs]
+                    tc = st.median([a for a, _, _ in pairs])
+                    tw = st.median([b for _, b, _ in pairs])
+                    rows.append({**meta, "mode": mode, "C": C, "sp": sp, "k": k, "out": out,
                                  "batch": BATCH, "trials": trials,
                                  "cudnn_ms": tc * 1000, "win_ms": tw * 1000,
                                  "ratio": tc / tw,
-                                 "ratio_min": min(ratios), "ratio_max": max(ratios)})
+                                 "ratio_min": min(ratios), "ratio_max": max(ratios),
+                                 **order_summary(pairs)})
+                    oe = order_summary(pairs).get("order_effect")
                     print(f"{C:5d}{sp:5d}{k:4d}{out:5d}{tc*1000:10.2f}{tw*1000:9.2f}"
-                          f"{tc/tw:8.2f}  [{min(ratios):.2f},{max(ratios):.2f}]", flush=True)
+                          f"{tc/tw:8.2f}  [{min(ratios):.2f},{max(ratios):.2f}]"
+                          + (f"  order {oe:.2f}" if oe else ""), flush=True)
                     del x, w
                     torch.cuda.empty_cache()
                 except (torch.cuda.OutOfMemoryError, RuntimeError):
@@ -115,9 +102,18 @@ def sweep(mode, trials, rows):
 
 def main(trials=3):
     rows = []
-    sweep("dense", trials, rows)
-    sweep("depthwise", trials, rows)
-    json.dump(rows, open(ROOT / "results" / f"crossover_map_{device_tag()}.json", "w"), indent=1)
+    meta = device_meta()
+    print({k: v for k, v in meta.items() if k in ("gpu", "driver", "power_limit_w",
+                                                  "power_default_w", "host_cpu")})
+    # The very first measurement of a sequence is penalised; spend it here.
+    x0 = torch.randn(BATCH, 30, 16, 16, 16, device="cuda", dtype=torch.half)
+    w0 = torch.randn(30, 30, 3, 3, 3, device="cuda", dtype=torch.half)
+    discard_warmup(lambda: F.conv3d(x0, w0))
+    discard_warmup(lambda: im2win_conv3d_minmat(x0, w0))
+    del x0, w0
+    sweep("dense", trials, rows, meta)
+    sweep("depthwise", trials, rows, meta)
+    json.dump(rows, open(results_dir() / f"crossover_map_{device_tag()}.json", "w"), indent=1)
 
     for mode in ("dense", "depthwise"):
         sel = [r for r in rows if r["mode"] == mode]

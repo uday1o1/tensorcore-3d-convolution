@@ -51,6 +51,8 @@ import torch.nn.functional as F
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))
 from winconv import im2win_conv3d_minmat
+from benchenv import (results_dir, device_tag, device_meta, timed_pair,
+                      order_summary, discard_warmup)
 
 torch.backends.cudnn.benchmark = True
 
@@ -60,24 +62,6 @@ KERNELS = [3, 5, 7, 9, 11]
 BATCH = 2
 
 
-
-def device_tag():
-    """Short filesystem-safe name for the GPU, so multi-device runs coexist."""
-    name = torch.cuda.get_device_name(0)
-    return (name.replace("NVIDIA ", "").replace("GeForce ", "")
-                .replace(" ", "").replace("/", "-").lower())
-
-
-def device_meta():
-    """Everything needed to interpret a timing later."""
-    p = torch.cuda.get_device_properties(0)
-    return {"gpu": torch.cuda.get_device_name(0),
-            "capability": f"{p.major}.{p.minor}",
-            "sm_count": p.multi_processor_count,
-            "total_mem_gb": round(p.total_memory / 1e9, 1),
-            "torch": torch.__version__,
-            "cuda": torch.version.cuda,
-            "cudnn": torch.backends.cudnn.version()}
 
 
 def timeit(fn, n=6, warmup=3):
@@ -93,6 +77,12 @@ def timeit(fn, n=6, warmup=3):
 
 def main(trials=5):
     rows = []
+    meta = device_meta()
+    x0 = torch.randn(BATCH, 30, 16, 16, 16, device="cuda", dtype=torch.half)
+    w0 = torch.randn(30, 30, 3, 3, 3, device="cuda", dtype=torch.half)
+    discard_warmup(lambda: F.conv3d(x0, w0))
+    discard_warmup(lambda: im2win_conv3d_minmat(x0, w0))
+    del x0, w0
     print(f'{"C":>5}{"sp":>4}{"k":>3} | {"fwd only":>18} | {"fwd+bwd":>18} | shift')
     print(f'{"":>5}{"":>4}{"":>3} | {"cuDNN":>8}{"ratio":>10} | {"cuDNN":>8}{"ratio":>10} |')
     for C in CHANNELS:
@@ -127,10 +117,15 @@ def main(trials=5):
                     step_ref = step(lambda: F.conv3d(x, w))
                     step_win = step(lambda: im2win_conv3d_minmat(x, w))
 
-                    f_ref = st.median([timeit(fwd_ref) for _ in range(trials)])
-                    f_win = st.median([timeit(fwd_win) for _ in range(trials)])
-                    t_ref = st.median([timeit(step_ref) for _ in range(trials)])
-                    t_win = st.median([timeit(step_win) for _ in range(trials)])
+                    # Interleaved with alternating order. An earlier version
+                    # timed all cuDNN trials, then all windowed ones, so any
+                    # drift across the block landed entirely on one side.
+                    fp = [timed_pair(fwd_ref, fwd_win, timeit, t) for t in range(trials)]
+                    sp_ = [timed_pair(step_ref, step_win, timeit, t) for t in range(trials)]
+                    f_ref = st.median([a for a, _, _ in fp])
+                    f_win = st.median([b for _, b, _ in fp])
+                    t_ref = st.median([a for a, _, _ in sp_])
+                    t_win = st.median([b for _, b, _ in sp_])
 
                     # The reuse that helps latency has a memory price: the
                     # materialized buffer must be RETAINED for the backward
@@ -146,7 +141,9 @@ def main(trials=5):
                         mem[name] = torch.cuda.max_memory_allocated() / 1e9
 
                     rf, rt = f_ref / f_win, t_ref / t_win
-                    rows.append({**device_meta(), "C": C, "sp": sp, "k": k, "batch": BATCH,
+                    rows.append({**meta, "fwd_order_effect": order_summary(fp).get("order_effect"),
+                                 "step_order_effect": order_summary(sp_).get("order_effect"),
+                                 "C": C, "sp": sp, "k": k, "batch": BATCH,
                                  "trials": trials,
                                  "fwd_cudnn_ms": f_ref * 1000,
                                  "fwd_win_ms": f_win * 1000, "fwd_ratio": rf,
@@ -168,7 +165,7 @@ def main(trials=5):
     if not rows:
         print("nothing measured")
         return 1
-    json.dump(rows, open(ROOT / "results" / f"training_crossover_{device_tag()}.json", "w"), indent=1)
+    json.dump(rows, open(results_dir() / f"training_crossover_{device_tag()}.json", "w"), indent=1)
 
     shifts = [r["shift"] for r in rows]
     better = sum(s > 0 for s in shifts)

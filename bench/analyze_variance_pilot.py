@@ -35,23 +35,31 @@ Usage:
 import itertools
 import json
 import math
+import os
 import statistics as st
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT / "src"))
+from benchenv import results_dir
 
 # MedNeXt's reported gain for uniform kernel 5 over kernel 3, on a 0-1 scale.
 TARGET_EFFECT = 0.002
 ALPHA = 0.05
 
-RESULTS = Path("/workspace/RESULTS_FOLDER/nnUNet/3d_fullres/Task003_Liver")
+# nnU-Net's own RESULTS_FOLDER environment variable locates trained runs, so
+# nothing about a particular machine's layout is assumed here.
+RESULTS = (Path(os.environ["RESULTS_FOLDER"]) / "nnUNet" / "3d_fullres" / "Task003_Liver"
+           if os.environ.get("RESULTS_FOLDER") else None)
 TRAINER = "nnUNetTrainerV2_MedNeXt_B_k3_150ep_s{}__nnUNetPlansv2.1_trgSp_1x1x1"
 CLASS_NAMES = {"1": "liver", "2": "tumor"}
 
 
 def default_paths():
     out = []
+    if RESULTS is None:
+        return out
     for seed in (1, 2, 3, 4, 5):
         p = RESULTS / TRAINER.format(seed) / "fold_0" / "validation_raw" / "summary.json"
         if p.exists():
@@ -124,6 +132,8 @@ def main(argv):
         print(f"need at least two run summaries, found {len(paths)}")
         for p in paths:
             print(f"  {p}")
+        if RESULTS is None and not argv[1:]:
+            print("\nSet RESULTS_FOLDER (nnU-Net's results root) or pass summary paths.")
         print("\nTraining AND validation must finish for each seed. The")
         print("per-epoch Dice in the training log is a diagnostic, not a result.")
         return 1
@@ -201,7 +211,7 @@ def main(argv):
                "classes": report, "worst_spread": worst_overall,
                "target_effect": TARGET_EFFECT, "verdict": verdict,
                "n_significant": total_sig, "n_comparisons": total_cmp},
-              open(ROOT / "results" / "variance_pilot.json", "w"), indent=1)
+              open(results_dir() / "variance_pilot.json", "w"), indent=1)
     return 0
 
 

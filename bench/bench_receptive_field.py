@@ -53,6 +53,7 @@ import torch.nn as nn
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))
+from benchenv import results_dir, device_meta
 from kernel_placement import set_stage_kernels, receptive_field
 
 # The placements named in the review, plus the uniform-5 upper bound they
@@ -157,7 +158,7 @@ def main():
                          "infer_ms": inf * 1000, "train_ms": tr * 1000,
                          "train_gb": mem, "receptive_field_voxels": rf,
                          "layers_retuned": changed,
-                         "gpu": torch.cuda.get_device_name(0)})
+                         **device_meta()})
             print(f"{name:<12}{pr/1e6:>10.2f}{fl/1e9:>10.1f}{inf*1000:>10.1f}"
                   f"{tr*1000:>10.1f}{mem:>10.2f}{rf:>8d}")
             del model
@@ -167,7 +168,7 @@ def main():
             print(f"{name:<12}  failed: {type(e).__name__}: {e}")
 
     if rows:
-        json.dump(rows, open(ROOT / "results" / "receptive_field_cost.json", "w"),
+        json.dump(rows, open(results_dir() / "receptive_field_cost.json", "w"),
                   indent=1)
         base = next((r for r in rows if r["placement"] == "3-3-3-3"), rows[0])
         print(f"\nrelative to {base['placement']}:")

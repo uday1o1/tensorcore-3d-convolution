@@ -39,6 +39,8 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))
 from winconv import im2win_conv3d_minmat
 from dispatch import prefer_windowed
+from benchenv import (results_dir, device_tag, device_meta, timed_pair,
+                      order_summary, discard_warmup)
 
 torch.backends.cudnn.benchmark = True
 
@@ -50,24 +52,6 @@ KERNELS = [3, 5, 7, 9]
 BATCH = 2
 
 
-
-def device_tag():
-    """Short filesystem-safe name for the GPU, so multi-device runs coexist."""
-    name = torch.cuda.get_device_name(0)
-    return (name.replace("NVIDIA ", "").replace("GeForce ", "")
-                .replace(" ", "").replace("/", "-").lower())
-
-
-def device_meta():
-    """Everything needed to interpret a timing later."""
-    p = torch.cuda.get_device_properties(0)
-    return {"gpu": torch.cuda.get_device_name(0),
-            "capability": f"{p.major}.{p.minor}",
-            "sm_count": p.multi_processor_count,
-            "total_mem_gb": round(p.total_memory / 1e9, 1),
-            "torch": torch.__version__,
-            "cuda": torch.version.cuda,
-            "cudnn": torch.backends.cudnn.version()}
 
 
 def timeit(fn, n=8):
@@ -98,7 +82,10 @@ def preflight():
     parity, since a cell near 1.0 cannot adjudicate anything.
     """
     from dispatch import DispatchingConv3d
-    own = ROOT / "results" / f"crossover_map_{device_tag()}.json"
+    name = f"crossover_map_{device_tag()}.json"
+    own = results_dir() / name
+    if not own.exists():
+        own = ROOT / "results" / name
     if own.exists():
         rows = [r for r in json.load(open(own)) if r.get("mode", "dense") == "dense"]
         rows.sort(key=lambda r: -abs(math.log(r["ratio"])))
@@ -136,6 +123,12 @@ def main(trials=5):
               "cannot serve as the oracle. Fix its timing before trusting anything below.")
         return 1
     rows = []
+    meta = device_meta()
+    x0 = torch.randn(BATCH, 48, 24, 24, 24, device="cuda", dtype=torch.half)
+    w0 = torch.randn(48, 48, 3, 3, 3, device="cuda", dtype=torch.half)
+    discard_warmup(lambda: F.conv3d(x0, w0))
+    discard_warmup(lambda: im2win_conv3d_minmat(x0, w0))
+    del x0, w0
     print(f"held-out grid: C={CHANNELS} spatial={SPATIAL} k={KERNELS} batch={BATCH}")
     print(f'{"C":>5}{"sp":>4}{"k":>3}{"out":>5}{"cuDNN_ms":>10}{"win_ms":>9}'
           f'{"ratio":>7}  {"rule":>5} {"correct":>8}')
@@ -148,15 +141,14 @@ def main(trials=5):
                 try:
                     x = torch.randn(BATCH, C, sp, sp, sp, device="cuda", dtype=torch.half)
                     w = torch.randn(C, C, k, k, k, device="cuda", dtype=torch.half)
-                    pairs = []
-                    for _ in range(trials):
-                        pairs.append((timeit(lambda: F.conv3d(x, w)),
-                                      timeit(lambda: im2win_conv3d_minmat(x, w))))
-                    tc = st.median([a for a, _ in pairs])
-                    tw = st.median([b for _, b in pairs])
+                    pairs = [timed_pair(lambda: F.conv3d(x, w),
+                                        lambda: im2win_conv3d_minmat(x, w), timeit, t)
+                             for t in range(trials)]
+                    tc = st.median([a for a, _, _ in pairs])
+                    tw = st.median([b for _, b, _ in pairs])
                     said = prefer_windowed(C, sp, k)
                     truth = tw < tc
-                    rows.append({**device_meta(), "C": C, "sp": sp, "k": k, "out": out,
+                    rows.append({**meta, **order_summary(pairs), "C": C, "sp": sp, "k": k, "out": out,
                                  "batch": BATCH, "trials": trials,
                                  "cudnn_ms": tc * 1000, "win_ms": tw * 1000,
                                  "ratio": tc / tw, "rule_says_windowed": said,
@@ -173,7 +165,7 @@ def main(trials=5):
     if not rows:
         print("no configurations measured")
         return 1
-    json.dump(rows, open(ROOT / "results" / f"dispatch_heldout_{device_tag()}.json", "w"), indent=1)
+    json.dump(rows, open(results_dir() / f"dispatch_heldout_{device_tag()}.json", "w"), indent=1)
 
     oracle = sum(min(r["cudnn_ms"], r["win_ms"]) for r in rows)
 

@@ -36,6 +36,7 @@ import torch.nn as nn
 # runs from anywhere in a fresh clone.
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))
+from benchenv import results_dir
 from winconv import WindowedConv3d
 
 torch.backends.cudnn.benchmark = True
@@ -170,7 +171,7 @@ def main():
     ap.add_argument("--fold", type=int, default=0)
     ap.add_argument("--cases", type=int, default=0,
                     help="limit number of validation cases, 0 means all")
-    ap.add_argument("--out", default=str(ROOT / "results" / "dice_identical_weights.json"))
+    ap.add_argument("--out", default=str(results_dir() / "dice_identical_weights.json"))
     args = ap.parse_args()
 
     found = resolve(args)
