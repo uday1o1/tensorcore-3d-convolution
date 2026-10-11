@@ -19,8 +19,18 @@ that JSON.
 | `train4090.log` | `../training_crossover_rtx4090.json` | `python bench/bench_training_crossover.py 5` |
 | `disp4090.log` | `../dispatch_heldout_rtx4090.json` | `python bench/bench_dispatch.py 5` |
 
-Two devices, with PyTorch and cuDNN pinned to the same versions on both so
-that cross-device differences are silicon rather than library version:
+Training logs from the placement study, as nnU-Net writes them (per-epoch
+losses, online Dice estimate, epoch time). The scores reported for each run
+are in `../validation/`, not the online estimate here.
+
+| Log | Run | Regenerate with |
+|---|---|---|
+| `train_k3_s1.log` | MedNeXt-B kernel 3, 150 epochs | `scripts/setup_vast.sh train nnUNetTrainerV2_MedNeXt_B_k3_150ep_s1` |
+| `train_place_3_5_5_7.log` | 3-5-5-7, UpKern from the kernel 3 run | `scripts/setup_vast.sh train nnUNetTrainerV2_MedNeXt_B_place_3_5_5_7_150ep` |
+
+Two hosts, with PyTorch and cuDNN pinned to the same versions on both so
+that cross-device differences are not library version (they remain host
+as well as GPU differences):
 
 - RTX 3090, sm_86, driver 595.71.05
 - RTX 4090, sm_89, 128 SMs, driver 570.144

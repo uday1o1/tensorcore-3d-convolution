@@ -13,6 +13,16 @@ variance pilot (results/variance_pilot.json) for that class. The pilot showed
 that a paired signed-rank test across cases calls two identical networks
 different, so the p value is reported but never decides anything on its own.
 
+Which cases count. A class is scored only on cases whose reference contains
+it. nnU-Net's own mean does otherwise: on a case without tumour it gives Dice 0
+if the network predicts any tumour voxel and leaves the case out if it predicts
+none, so two runs are averaged over different sets of cases and a few stray
+voxels on one tumour-free scan move the mean by as much as a real difference.
+In this study one run marked 36 voxels on a tumour-free case and was averaged
+over 26 cases against the baseline's 25. False detections on cases without the
+class are reported separately, as a count of cases and voxels, and nnU-Net's
+own mean is kept alongside for comparison.
+
 Cost and receptive field come from the committed cost measurements, so the
 output is the Pareto table with an accuracy column, not a separate result.
 
@@ -29,7 +39,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))
 sys.path.insert(0, str(ROOT / "bench"))
 from benchenv import results_dir
-from analyze_variance_pilot import per_case, wilcoxon_signed_rank, CLASS_NAMES
+from analyze_variance_pilot import wilcoxon_signed_rank, CLASS_NAMES
 
 VALIDATION = ROOT / "results" / "validation"
 BASELINE = "nnUNetTrainerV2_MedNeXt_B_k3_150ep_s1"
@@ -44,25 +54,57 @@ RUNS = {
 }
 
 
-def noise_floor():
-    """Seed spread per class from the variance pilot, in either stored format."""
+def noise_floor(n_present):
+    """Seed spread per class from the variance pilot, on this script's case rule.
+
+    The pilot averaged over cases scored in both runs (n_used), which for
+    tumour included tumour-free cases where both runs scored 0. Every case that
+    contains the class is scored in every run, so the pilot's set is those
+    cases plus tumour-free ones contributing a difference of exactly zero. The
+    summed difference is therefore the same on both rules and only the divisor
+    changes, which converts the spread exactly without the pilot's raw files.
+    """
     d = json.load(open(ROOT / "results" / "variance_pilot.json"))
     out = {}
     for cls, v in d["classes"].items():
-        out[cls] = v["spread"] if "spread" in v else v["worst_spread"]
+        spread = v["spread"] if "spread" in v else v["worst_spread"]
+        n_used = v.get("n_used", n_present.get(cls))
+        out[cls] = spread * n_used / n_present[cls] if n_present.get(cls) else spread
     return out
 
 
+def load(path):
+    """Per case: {class: (dice, reference voxels, predicted voxels)}, and nnU-Net's mean."""
+    d = json.load(open(path))
+    cases = {}
+    for case in d["results"]["all"]:
+        cases[Path(str(case["reference"])).name] = {
+            k: (v["Dice"], v["Total Positives Reference"], v["Total Positives Test"])
+            for k, v in case.items() if k.isdigit() and isinstance(v, dict)}
+    nnunet_mean = {k: v["Dice"] for k, v in d["results"]["mean"].items() if k.isdigit()}
+    return cases, nnunet_mean
+
+
+def present(run, cls):
+    """Cases whose reference contains the class; Dice is defined on all of them."""
+    return {k: v[cls][0] for k, v in run.items() if cls in v and v[cls][1] > 0}
+
+
+def false_detections(run, cls):
+    """Cases without the class in the reference where the network predicted it."""
+    hits = [v[cls][2] for v in run.values() if cls in v and v[cls][1] == 0 and v[cls][2] > 0]
+    return {"cases": len(hits), "voxels": sum(hits)}
+
+
 def mean_dice(run, cls):
-    vals = [v[cls] for v in run.values() if cls in v and not math.isnan(v[cls])]
+    vals = list(present(run, cls).values())
     return st.mean(vals) if vals else None
 
 
 def paired(run, base, cls):
-    keys = [k for k in sorted(set(run) & set(base))
-            if cls in run[k] and cls in base[k]
-            and not math.isnan(run[k][cls]) and not math.isnan(base[k][cls])]
-    diffs = [run[k][cls] - base[k][cls] for k in keys]
+    a, b = present(run, cls), present(base, cls)
+    keys = sorted(set(a) & set(b))
+    diffs = [a[k] - b[k] for k in keys]
     return {"n": len(keys), "delta": st.mean(diffs) if diffs else None,
             "p": wilcoxon_signed_rank(diffs)}
 
@@ -82,9 +124,10 @@ def main():
     if BASELINE not in found:
         print(f"baseline summary missing: {VALIDATION / (BASELINE + '_summary.json')}")
         return 1
-    runs = {t: per_case(p) for t, p in found.items()}
+    loaded = {t: load(p) for t, p in found.items()}
+    runs = {t: v[0] for t, v in loaded.items()}
     base = runs[BASELINE]
-    floor = noise_floor()
+    floor = noise_floor({c: len(present(base, c)) for c in ("1", "2")})
     costs = cost_table()
     classes = ["1", "2"]
 
@@ -109,6 +152,8 @@ def main():
         for cls in classes:
             m = mean_dice(runs[t], cls)
             row[f"dice_{CLASS_NAMES[cls]}"] = m
+            row[f"nnunet_mean_{CLASS_NAMES[cls]}"] = loaded[t][1].get(cls)
+            row[f"false_detections_{CLASS_NAMES[cls]}"] = false_detections(runs[t], cls)
             if t == BASELINE:
                 line += f"{m:>12.4f}{'':>9}{'':>7}"
                 continue
@@ -120,6 +165,12 @@ def main():
         rows.append(row)
         print(line)
     print("\n* delta exceeds the seed spread for that class; nothing else is read as a difference")
+    print("Dice over cases containing the class; false detections on cases without it:")
+    for row in rows:
+        fd = row["false_detections_tumor"]
+        print(f"  {row['placement'] + ('' if row['init'] != 'scratch' else ' scratch'):<20}"
+              f"tumour on {fd['cases']} tumour-free case(s), {fd['voxels']} voxels;"
+              f"  nnU-Net's own means {row['nnunet_mean_liver']:.4f} / {row['nnunet_mean_tumor']:.4f}")
 
     # Training strategy: the same architecture with and without UpKern.
     up = "nnUNetTrainerV2_MedNeXt_B_place_3_5_5_7_150ep"
