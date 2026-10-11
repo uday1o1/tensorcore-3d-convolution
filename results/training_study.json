@@ -27,6 +27,39 @@
    }
   },
   {
+   "trainer": "nnUNetTrainerV2_MedNeXt_B_place_3_3_5_5_150ep",
+   "placement": "3-3-5-5",
+   "init": "UpKern",
+   "n_cases": 27,
+   "train_cost": 1.0815951706280746,
+   "rf_theoretical": 271,
+   "rf_mass90": 70,
+   "dice_liver": 0.9652091858229894,
+   "nnunet_mean_liver": 0.9652091858229894,
+   "false_detections_liver": {
+    "cases": 0,
+    "voxels": 0
+   },
+   "liver": {
+    "n": 27,
+    "delta": 0.0010369480935105064,
+    "p": 0.04883264981166002,
+    "beyond_seed_noise": true
+   },
+   "dice_tumor": 0.7311340892580127,
+   "nnunet_mean_tumor": 0.6748930054689348,
+   "false_detections_tumor": {
+    "cases": 2,
+    "voxels": 27278
+   },
+   "tumor": {
+    "n": 24,
+    "delta": 0.021260216288408223,
+    "p": 0.6891565167793516,
+    "beyond_seed_noise": false
+   }
+  },
+  {
    "trainer": "nnUNetTrainerV2_MedNeXt_B_place_3_5_5_7_150ep",
    "placement": "3-5-5-7",
    "init": "UpKern",
