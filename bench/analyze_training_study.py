@@ -4,9 +4,12 @@ Reads the per-case validation summaries in results/validation/ and compares
 every trained configuration against the MedNeXt-B kernel 3 baseline, on the
 same fold, the same plans and the same evaluation path.
 
-Two questions, one per comparison family:
+Three comparison families:
   architecture       3-3-5-5, 3-5-5-7, 5-5-5-5, all UpKern initialized
   training strategy  3-5-5-7 UpKern against 3-5-5-7 from scratch
+  control            each UpKern placement against 3-3-3-3 continued from the
+                     same source by the same protocol, which separates what
+                     the kernels add from what UpKern's extra training adds
 
 A difference is only read as one if it exceeds the seed spread measured by the
 variance pilot (results/variance_pilot.json) for that class. The pilot showed
@@ -50,8 +53,10 @@ RUNS = {
     "nnUNetTrainerV2_MedNeXt_B_place_3_5_5_7_150ep": ("3-5-5-7", "UpKern"),
     "nnUNetTrainerV2_MedNeXt_B_place_5_5_5_5_150ep": ("5-5-5-5", "UpKern"),
     "nnUNetTrainerV2_MedNeXt_B_place_3_5_5_7_scratch_150ep": ("3-5-5-7", "scratch"),
+    "nnUNetTrainerV2_MedNeXt_B_place_3_3_3_3_continued_150ep": ("3-3-3-3", "continued"),
     "nnUNetTrainerV2_150ep": ("nnU-Net", "trained"),
 }
+CONTROL = "nnUNetTrainerV2_MedNeXt_B_place_3_3_3_3_continued_150ep"
 
 
 def noise_floor(n_present):
@@ -187,8 +192,27 @@ def main():
             print(f"  {CLASS_NAMES[cls]:<7} UpKern minus scratch {r['delta']:+.4f}  p {ps}  "
                   f"{'beyond' if beyond else 'within'} seed noise {floor[cls]:.4f}")
 
+    # Kernels or extra training: UpKern placements against the same protocol
+    # with nothing enlarged.
+    control = None
+    if CONTROL in runs:
+        control = {}
+        print("\nUpKern placements against 3-3-3-3 continued (same protocol, no larger kernels)")
+        for t, (placement, init) in RUNS.items():
+            if init != "UpKern" or t not in runs:
+                continue
+            control[placement] = {}
+            for cls in classes:
+                r = paired(runs[t], runs[CONTROL], cls)
+                beyond = r["delta"] is not None and abs(r["delta"]) > floor[cls]
+                control[placement][CLASS_NAMES[cls]] = {**r, "beyond_seed_noise": beyond}
+                ps = f"{r['p']:.3f}" if r["p"] is not None else "n/a"
+                print(f"  {placement:<8}{CLASS_NAMES[cls]:<7}{r['delta']:+.4f}  p {ps}  "
+                      f"{'beyond' if beyond else 'within'} seed noise {floor[cls]:.4f}")
+
     json.dump({"baseline": BASELINE, "noise_floor": {CLASS_NAMES[c]: floor[c] for c in classes},
-               "rows": rows, "upkern_vs_scratch": strategy},
+               "rows": rows, "upkern_vs_scratch": strategy,
+               "upkern_vs_continued": control},
               open(results_dir() / "training_study.json", "w"), indent=1)
     return 0
 

@@ -42,6 +42,21 @@ class MedNeXtPlacementTrainer(nnUNetTrainerV2_MedNeXt_B_kernel3):
     # that holds when large kernels are confined to deep stages. The refusal
     # below guards against falling back to scratch by accident, not on purpose.
     UPKERN = True
+    # Only meaningful at 3-3-3-3: start from the trained kernel 3 network
+    # instead of leaving it randomly initialized. The control for UpKern's
+    # extra training.
+    CONTINUE = False
+
+    def _upkern_source(self):
+        src = os.environ.get("MEDNEXT_UPKERN_SOURCE")
+        if not src or not Path(src).exists():
+            raise RuntimeError(
+                "MEDNEXT_UPKERN_SOURCE is unset or missing. Large kernel MedNeXt "
+                "trained from scratch is reported by its authors to perform no "
+                "better than small kernels, so a run without UpKern would measure "
+                "an optimization failure rather than the effect of receptive "
+                "field. Point it at the trained kernel-3 checkpoint.")
+        return src
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -52,7 +67,18 @@ class MedNeXtPlacementTrainer(nnUNetTrainerV2_MedNeXt_B_kernel3):
         super().initialize_network()
 
         if list(self.KERNELS) == [3, 3, 3, 3]:
-            self.print_to_log_file("placement 3-3-3-3, network left unchanged")
+            if not self.CONTINUE:
+                self.print_to_log_file("placement 3-3-3-3, network left unchanged")
+                return
+            # UpKern from kernel 3 into kernel 3 is a plain weight copy, so
+            # this is the UpKern protocol with nothing enlarged: same source,
+            # same fresh optimizer and learning rate schedule, same total
+            # training. Whatever UpKern placements gain over the baseline
+            # beyond what this gains is attributable to the kernels.
+            src = self._upkern_source()
+            state = torch.load(src, map_location="cpu", weights_only=False)
+            self.network.load_state_dict(state["state_dict"])
+            self.print_to_log_file(f"placement 3-3-3-3, continued from {src}")
             return
 
         # Keep an untouched kernel-3 copy to serve as the UpKern source shape,
@@ -78,15 +104,7 @@ class MedNeXtPlacementTrainer(nnUNetTrainerV2_MedNeXt_B_kernel3):
                 "by design (UPKERN = False), the training strategy ablation")
             return
 
-        src = os.environ.get("MEDNEXT_UPKERN_SOURCE")
-        if not src or not Path(src).exists():
-            raise RuntimeError(
-                "MEDNEXT_UPKERN_SOURCE is unset or missing. Large kernel MedNeXt "
-                "trained from scratch is reported by its authors to perform no "
-                "better than small kernels, so a run without UpKern would measure "
-                "an optimization failure rather than the effect of receptive "
-                "field. Point it at the trained kernel-3 checkpoint.")
-
+        src = self._upkern_source()
         state = torch.load(src, map_location="cpu", weights_only=False)
         reference.load_state_dict(state["state_dict"])
         self.network = upkern_load_weights(self.network, reference.cuda())
