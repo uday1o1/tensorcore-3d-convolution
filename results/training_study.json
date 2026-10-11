@@ -58,7 +58,53 @@
     "p": 0.24142655338204433,
     "beyond_seed_noise": false
    }
+  },
+  {
+   "trainer": "nnUNetTrainerV2_MedNeXt_B_place_3_5_5_7_scratch_150ep",
+   "placement": "3-5-5-7",
+   "init": "scratch",
+   "n_cases": 27,
+   "train_cost": 1.315198159785229,
+   "rf_theoretical": 371,
+   "rf_mass90": 73,
+   "dice_liver": 0.9643831936290157,
+   "nnunet_mean_liver": 0.9643831936290157,
+   "false_detections_liver": {
+    "cases": 0,
+    "voxels": 0
+   },
+   "liver": {
+    "n": 27,
+    "delta": 0.00021095589953672527,
+    "p": 0.17849611324735748,
+    "beyond_seed_noise": false
+   },
+   "dice_tumor": 0.7200307948305991,
+   "nnunet_mean_tumor": 0.6646438106128605,
+   "false_detections_tumor": {
+    "cases": 2,
+    "voxels": 27478
+   },
+   "tumor": {
+    "n": 24,
+    "delta": 0.010156921860994506,
+    "p": 0.7103183482536846,
+    "beyond_seed_noise": false
+   }
   }
  ],
- "upkern_vs_scratch": null
+ "upkern_vs_scratch": {
+  "liver": {
+   "n": 27,
+   "delta": 0.0009060540930294912,
+   "p": 0.05460576776580561,
+   "beyond_seed_noise": true
+  },
+  "tumor": {
+   "n": 24,
+   "delta": 0.023608025558753735,
+   "p": 0.841480581121794,
+   "beyond_seed_noise": false
+  }
+ }
 }
