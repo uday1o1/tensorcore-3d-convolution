@@ -173,7 +173,8 @@ def main():
     print("Dice over cases containing the class; false detections on cases without it:")
     for row in rows:
         fd = row["false_detections_tumor"]
-        print(f"  {row['placement'] + ('' if row['init'] != 'scratch' else ' scratch'):<20}"
+        label = row["placement"] + ("" if row["init"] in ("trained", "UpKern") else f" {row['init']}")
+        print(f"  {label:<20}"
               f"tumour on {fd['cases']} tumour-free case(s), {fd['voxels']} voxels;"
               f"  nnU-Net's own means {row['nnunet_mean_liver']:.4f} / {row['nnunet_mean_tumor']:.4f}")
 

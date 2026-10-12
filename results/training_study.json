@@ -159,6 +159,39 @@
    }
   },
   {
+   "trainer": "nnUNetTrainerV2_MedNeXt_B_place_3_3_3_3_continued_150ep",
+   "placement": "3-3-3-3",
+   "init": "continued",
+   "n_cases": 27,
+   "train_cost": 1.0,
+   "rf_theoretical": 151,
+   "rf_mass90": 59,
+   "dice_liver": 0.9649598865208069,
+   "nnunet_mean_liver": 0.9649598865208069,
+   "false_detections_liver": {
+    "cases": 0,
+    "voxels": 0
+   },
+   "liver": {
+    "n": 27,
+    "delta": 0.0007876487913279773,
+    "p": 0.018550143984988443,
+    "beyond_seed_noise": true
+   },
+   "dice_tumor": 0.7507825515987385,
+   "nnunet_mean_tumor": 0.6930300476296047,
+   "false_detections_tumor": {
+    "cases": 2,
+    "voxels": 27573
+   },
+   "tumor": {
+    "n": 24,
+    "delta": 0.04090867862913397,
+    "p": 0.039672486265975415,
+    "beyond_seed_noise": false
+   }
+  },
+  {
    "trainer": "nnUNetTrainerV2_150ep",
    "placement": "nnU-Net",
    "init": "trained",
@@ -203,5 +236,48 @@
    "beyond_seed_noise": false
   }
  },
- "upkern_vs_continued": null
+ "upkern_vs_continued": {
+  "3-3-5-5": {
+   "liver": {
+    "n": 27,
+    "delta": 0.00024929930218252913,
+    "p": 0.4859749282803689,
+    "beyond_seed_noise": false
+   },
+   "tumor": {
+    "n": 24,
+    "delta": -0.019648462340725748,
+    "p": 0.6891565167793516,
+    "beyond_seed_noise": false
+   }
+  },
+  "3-5-5-7": {
+   "liver": {
+    "n": 27,
+    "delta": 0.00032936120123823925,
+    "p": 0.6829616948348547,
+    "beyond_seed_noise": false
+   },
+   "tumor": {
+    "n": 24,
+    "delta": -0.007143731209385729,
+    "p": 0.4237107971667933,
+    "beyond_seed_noise": false
+   }
+  },
+  "5-5-5-5": {
+   "liver": {
+    "n": 27,
+    "delta": 0.00033027559525047157,
+    "p": 0.4278798079182491,
+    "beyond_seed_noise": false
+   },
+   "tumor": {
+    "n": 24,
+    "delta": 0.005639782474991359,
+    "p": 0.7533040472859123,
+    "beyond_seed_noise": false
+   }
+  }
+ }
 }
