@@ -123,6 +123,43 @@ def session_agreement(maps, trains):
     return out
 
 
+def same_gpu_two_hosts(agree):
+    """Separate the GPU from the host, using a second RTX 4090 host.
+
+    The two-device comparison had one host per GPU, so a winner change between
+    the RTX 3090 and RTX 4090 results could be either. results/host2/ holds two
+    crossover sessions on a different RTX 4090 host. Winner changes between the
+    two RTX 4090 hosts are host effects with the GPU held fixed; if they are as
+    common as the changes between the 3090 and 4090 hosts, the host explains
+    the cross-device result as well as the GPU does.
+
+    Every count uses only cells whose sessions agree on each host, the same
+    filter the cross-device count uses. Returns None when the files are absent.
+    """
+    d = RESULTS / "host2"
+    files = [d / "crossover_map_s1.json", d / "crossover_map_s2.json"]
+    if not all(f.exists() for f in files) or "rtx4090" not in agree or "rtx3090" not in agree:
+        return None
+    s1, s2 = ({(r["C"], r["sp"], r["k"]): r["ratio"] for r in json.load(open(f))
+               if r.get("mode", "dense") == "dense"} for f in files)
+    cells = sorted(set(s1) & set(s2) & set(agree["rtx4090"]["cells"]))
+    host2 = {k: ((s1[k] > 1) if (s1[k] > 1) == (s2[k] > 1) else None) for k in cells}
+
+    def changes(x):
+        return [k for k in cells if x[k] is not None and host2[k] is not None
+                and x[k] != host2[k]]
+
+    return {"cells": cells, "host2_disagree": [k for k in cells if host2[k] is None],
+            "same_gpu_changes": changes(agree["rtx4090"]["verdicts"]),
+            "rtx3090_vs_host2_changes": changes(agree["rtx3090"]["verdicts"]),
+            "rtx3090_vs_host1_changes": [
+                k for k in cells if agree["rtx3090"]["verdicts"][k] is not None
+                and agree["rtx4090"]["verdicts"][k] is not None
+                and agree["rtx3090"]["verdicts"][k] != agree["rtx4090"]["verdicts"][k]],
+            "meta": {k: json.load(open(files[0]))[0].get(k)
+                     for k in ("driver", "power_limit_w", "host_cpu")}}
+
+
 def main():
     maps = load("crossover_map")
     if len(maps) < 2:
@@ -253,6 +290,20 @@ def main():
             print(f"  {tag}: dense wins, crossover sweep "
                   f"{sum(a['cm'][k] > 1 for k in a['cells'])}, confirmed by both "
                   f"sessions {sum(a['cm'][k] > 1 and a['tc'][k] > 1 for k in a['cells'])}")
+
+    h = same_gpu_two_hosts(agree) if agree else None
+    if h:
+        n = len(h["cells"])
+        print("\nSAME GPU, TWO HOSTS (RTX 4090, second host in results/host2/)")
+        print(f"  second host: driver {h['meta']['driver']}, power limit "
+              f"{h['meta']['power_limit_w']} W, {h['meta']['host_cpu']}")
+        print(f"  second host, its two sessions disagree on   {len(h['host2_disagree'])}/{n}")
+        print(f"  RTX 4090 host 1 vs RTX 4090 host 2 changes  {len(h['same_gpu_changes'])}/{n}"
+              "   GPU fixed, host varies")
+        print(f"  RTX 3090 host vs RTX 4090 host 1 changes    {len(h['rtx3090_vs_host1_changes'])}/{n}")
+        print(f"  RTX 3090 host vs RTX 4090 host 2 changes    {len(h['rtx3090_vs_host2_changes'])}/{n}")
+        for k in h["same_gpu_changes"]:
+            print(f"      same GPU, different winner: C{k[0]} sp{k[1]} k{k[2]}")
 
     # The claim that matters most, and the one we made no prediction about.
     trains = load("training_crossover")
