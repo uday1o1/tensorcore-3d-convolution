@@ -30,6 +30,8 @@ host; `../validation/training_host_*.txt` records each.
 | `train_k3_s1.log` | MedNeXt-B kernel 3, 150 epochs | `scripts/setup_vast.sh train nnUNetTrainerV2_MedNeXt_B_k3_150ep_s1` |
 | `train_place_3_5_5_7.log` | 3-5-5-7, UpKern from the kernel 3 run | `scripts/setup_vast.sh train nnUNetTrainerV2_MedNeXt_B_place_3_5_5_7_150ep` |
 | `train_place_3_3_5_5.log` | 3-3-5-5, UpKern from the kernel 3 run | `scripts/setup_vast.sh train nnUNetTrainerV2_MedNeXt_B_place_3_3_5_5_150ep` |
+| `train_place_5_5_5_5.log` | 5-5-5-5, UpKern from the kernel 3 run | `scripts/setup_vast.sh train nnUNetTrainerV2_MedNeXt_B_place_5_5_5_5_150ep` |
+| `train_nnunet.log` | nnU-Net, same plans and fold | `scripts/setup_vast.sh train nnUNetTrainerV2_150ep` |
 | `train_place_3_5_5_7_scratch.log` | 3-5-5-7, from scratch | `scripts/setup_vast.sh train nnUNetTrainerV2_MedNeXt_B_place_3_5_5_7_scratch_150ep` |
 
 Two hosts, with PyTorch and cuDNN pinned to the same versions on both so
