@@ -92,12 +92,17 @@ CLAIMED = {
     "study, largest placement-vs-continued liver gap": 0.0003,
     "study, tumour seed spread on present cases": 0.0424,
     "study, cases containing tumour": 24,
+    # Second RTX 4090 host (results/host2/)
+    "hosts, second 4090 host session disagreements": 1,
+    "hosts, 4090 host 1 vs host 2 winner changes": 0,
+    "hosts, 3090 host vs 4090 host 2 winner changes": 14,
 }
 # Dice values and their differences are quoted to four decimals, where a
 # relative tolerance would hide errors larger than the effects themselves;
 # they must agree to rounding.
 ABS_TOL = {k: 0.00005 for k in CLAIMED if k.startswith("study,")}
 COUNTS.add("study, cases containing tumour")
+COUNTS.update(k for k in CLAIMED if k.startswith("hosts,"))
 
 
 def rule(r):
@@ -218,7 +223,7 @@ def main():
 
     try:
         sys.path.insert(0, str(Path(__file__).resolve().parent))
-        from compare_devices import load, session_agreement
+        from compare_devices import load, session_agreement, same_gpu_two_hosts
         ag = session_agreement(load("crossover_map"), load("training_crossover"))
     except Exception as e:
         ag = {}
@@ -241,6 +246,15 @@ def main():
     else:
         for k in list(CLAIMED):
             if k.startswith("audit,"):
+                CLAIMED.pop(k)
+    h = same_gpu_two_hosts(ag) if ag else None
+    if h:
+        computed["hosts, second 4090 host session disagreements"] = len(h["host2_disagree"])
+        computed["hosts, 4090 host 1 vs host 2 winner changes"] = len(h["same_gpu_changes"])
+        computed["hosts, 3090 host vs 4090 host 2 winner changes"] = len(h["rtx3090_vs_host2_changes"])
+    else:
+        for k in list(CLAIMED):
+            if k.startswith("hosts,"):
                 CLAIMED.pop(k)
 
     study_path = ROOT / "results" / "training_study.json"

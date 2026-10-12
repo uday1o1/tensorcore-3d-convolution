@@ -51,8 +51,11 @@ machine, an RTX 4090 host against the RTX 3090 host, 13 of 60 configurations
 change winner even counting only cells that two independent sessions on each
 host agree on, the clause that looked strongest on the first machine is dead on
 the second, and the rule's advantage over simply calling cuDNN falls from 8.25%
-to 0.01%. With one host per GPU this cannot separate the GPU generation from the
-host, so it is reported as a difference between two machines.
+to 0.01%. A second RTX 4090 host, with a different driver, processor and power
+limit, agrees with the first on all 60 configurations by the same two-session
+standard, while each differs from the RTX 3090 host in 13 or 14. The change
+follows the GPU rather than the host, at least on the 4090 side; the RTX 3090
+host was not replicated.
 
 **Part II, kernel placement.** Given that the cost is close to fixed, the
 question is where to spend it, and the usual candidate is receptive field.
@@ -144,8 +147,10 @@ the checkpoint is produced by training `src/trainers/nnUNetTrainerV2_150ep.py`.
 same one used in Im2win's own published evaluation, which is what makes the
 reproduction comparable. Results tagged `rtx3090` come from one RTX 3090 host
 (driver 595.71.05) and results tagged `rtx4090` from one RTX 4090 host (driver
-570.144), with PyTorch and cuDNN pinned to the same versions on both. One host
-per GPU means cross-device comparisons cannot separate GPU from host.
+570.144), with PyTorch and cuDNN pinned to the same versions on both.
+`results/host2/` holds two crossover sessions on a second RTX 4090 host
+(driver 580.95.05, AMD EPYC 7742, 400 W power limit), which separates the GPU
+from the host on the 4090 side.
 
 Two sessions of the same convolutions on the same host can disagree. On the RTX
 3090 host, 4 of 60 cells change winner between sessions, so single cells near
