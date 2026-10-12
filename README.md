@@ -55,7 +55,7 @@ to 0.01%. With one host per GPU this cannot separate the GPU generation from the
 host, so it is reported as a difference between two machines.
 
 **Part II, kernel placement.** Given that the cost is close to fixed, the
-question is where to spend it, and the thing worth buying is receptive field.
+question is where to spend it, and the usual candidate is receptive field.
 Cost is very unevenly distributed across stages: enlarging an early-stage kernel
 is expensive because it carries the full spatial extent, while a deep stage has
 been downsampled repeatedly and is nearly free to enlarge.
@@ -67,13 +67,38 @@ than enlarging every stage (5-5-5-5), 149 voxels against 121, at lower cost,
 measurement to establish. FLOPs miss this entirely, rating uniform enlargement at
 1.21x where the measured training step is 2.00x.
 
-**Why no placement accuracy comparison.** Two runs of one configuration
-differing only in random seed differ by 0.0407 tumour Dice, twenty times the
-effect such a study chases, and a paired signed-rank test across validation
-cases calls them significantly different at p = 0.049 despite there being no
-architectural difference to detect. Single-run ablations on a single fold of this
-task can manufacture significance from seed noise, and only a replicate exposes
-it.
+**Trained comparison: the accuracy gain is UpKern's extra training.** Each
+placement was trained for 150 epochs on fold 0 of MSD Liver, under the same
+plans and evaluation, and compared with MedNeXt-B at kernel 3 (liver Dice
+0.9642). A difference counts only if it exceeds the seed spread measured by
+training one configuration twice (liver 0.0005, tumour 0.0424); tumour is
+scored on the 24 validation cases that contain tumour.
+
+| Configuration | Training cost | Liver Dice | vs kernel 3 |
+|---|---|---|---|
+| 3-3-5-5, UpKern | 1.08x | 0.9652 | +0.0010 |
+| 3-5-5-7, UpKern | 1.32x | 0.9653 | +0.0011 |
+| 5-5-5-5, UpKern | 2.00x | 0.9653 | +0.0011 |
+| 3-5-5-7, from scratch | 1.32x | 0.9644 | +0.0002, within noise |
+| 3-3-3-3, continued by the UpKern protocol | 1.00x | 0.9650 | +0.0008 |
+| nnU-Net | | 0.9546 | -0.0095 |
+
+Every UpKern placement gains about 0.001 liver Dice, whatever its kernels,
+receptive field or cost, and the same placement trained from scratch gains
+nothing. UpKern starts from the trained kernel 3 network, so those runs also
+train twice as long. Kernel 3 restarted the same way, with nothing enlarged,
+recovers almost all of the gain, and against it no placement differs by more
+than 0.0003 liver Dice, inside the seed spread. On this task the measured
+benefit of large kernels is the second round of training, not the kernels.
+Tumour differences are inside the seed spread throughout. MedNeXt-B at kernel
+3 beats nnU-Net by 0.0095 liver Dice, nineteen times the seed spread.
+
+That seed spread carries its own caution. The two identically configured runs
+that define it differ by 0.0407 tumour Dice in nnU-Net's own averaging, and a
+paired signed-rank test across validation cases calls them significantly
+different at p = 0.049 despite there being no architectural difference to
+detect. Single-run ablations on a single fold can manufacture significance
+from seed noise, and only a replicate exposes it.
 
 ## Reproducing
 

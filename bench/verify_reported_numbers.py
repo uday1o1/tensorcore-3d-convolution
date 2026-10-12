@@ -78,7 +78,26 @@ CLAIMED = {
     "audit, cross-host winner changes, one session": 17,
     "audit, cross-host winner changes, session-confirmed": 13,
     "audit, 3090 rule 2 confirmed by both sessions": 10,
+    # Trained placement study (results/training_study.json)
+    "study, kernel 3 liver Dice": 0.9642,
+    "study, 3-3-5-5 liver Dice": 0.9652,
+    "study, 3-5-5-7 liver Dice": 0.9653,
+    "study, 5-5-5-5 liver Dice": 0.9653,
+    "study, 3-5-5-7 scratch liver Dice": 0.9644,
+    "study, kernel 3 continued liver Dice": 0.9650,
+    "study, nnU-Net liver Dice": 0.9546,
+    "study, 3-5-5-7 scratch liver gain": 0.0002,
+    "study, continued liver gain": 0.0008,
+    "study, nnU-Net liver gap": -0.0095,
+    "study, largest placement-vs-continued liver gap": 0.0003,
+    "study, tumour seed spread on present cases": 0.0424,
+    "study, cases containing tumour": 24,
 }
+# Dice values and their differences are quoted to four decimals, where a
+# relative tolerance would hide errors larger than the effects themselves;
+# they must agree to rounding.
+ABS_TOL = {k: 0.00005 for k in CLAIMED if k.startswith("study,")}
+COUNTS.add("study, cases containing tumour")
 
 
 def rule(r):
@@ -224,17 +243,43 @@ def main():
             if k.startswith("audit,"):
                 CLAIMED.pop(k)
 
+    study_path = ROOT / "results" / "training_study.json"
+    if study_path.exists():
+        sd = json.load(open(study_path))
+        by = {r["trainer"]: r for r in sd["rows"]}
+        k3 = by["nnUNetTrainerV2_MedNeXt_B_k3_150ep_s1"]["dice_liver"]
+        name = {"nnUNetTrainerV2_MedNeXt_B_k3_150ep_s1": "kernel 3",
+                "nnUNetTrainerV2_MedNeXt_B_place_3_3_5_5_150ep": "3-3-5-5",
+                "nnUNetTrainerV2_MedNeXt_B_place_3_5_5_7_150ep": "3-5-5-7",
+                "nnUNetTrainerV2_MedNeXt_B_place_5_5_5_5_150ep": "5-5-5-5",
+                "nnUNetTrainerV2_MedNeXt_B_place_3_5_5_7_scratch_150ep": "3-5-5-7 scratch",
+                "nnUNetTrainerV2_MedNeXt_B_place_3_3_3_3_continued_150ep": "kernel 3 continued",
+                "nnUNetTrainerV2_150ep": "nnU-Net"}
+        for t, n in name.items():
+            computed[f"study, {n} liver Dice"] = by[t]["dice_liver"]
+        computed["study, 3-5-5-7 scratch liver gain"] = by["nnUNetTrainerV2_MedNeXt_B_place_3_5_5_7_scratch_150ep"]["dice_liver"] - k3
+        computed["study, continued liver gain"] = by["nnUNetTrainerV2_MedNeXt_B_place_3_3_3_3_continued_150ep"]["dice_liver"] - k3
+        computed["study, nnU-Net liver gap"] = by["nnUNetTrainerV2_150ep"]["dice_liver"] - k3
+        computed["study, largest placement-vs-continued liver gap"] = max(
+            abs(v["liver"]["delta"]) for v in sd["upkern_vs_continued"].values())
+        computed["study, tumour seed spread on present cases"] = sd["noise_floor"]["tumor"]
+        computed["study, cases containing tumour"] = by["nnUNetTrainerV2_MedNeXt_B_place_3_5_5_7_150ep"]["tumor"]["n"]
+    else:
+        for k in list(CLAIMED):
+            if k.startswith("study,"):
+                CLAIMED.pop(k)
+
     print(f"crossover grid: {len(dense)} dense, {len(depth)} depthwise, "
           f"{dense[0].get('trials','?')} trials each")
     print(f"held out grid:  {len(held)} configurations\n")
-    print(f"  {'claim':<38}{'stated':>10}{'computed':>12}")
+    print(f"  {'claim':<48}{'stated':>10}{'computed':>12}")
     ok = True
     for name, claim in CLAIMED.items():
         got = computed[name]
-        tol = 0 if name in COUNTS else 0.015 * abs(claim)
+        tol = 0 if name in COUNTS else ABS_TOL.get(name, 0.015 * abs(claim))
         good = abs(got - claim) <= tol
         ok &= good
-        print(f"  {name:<38}{claim:>10}{got:>12.3f}  "
+        print(f"  {name:<48}{claim:>10}{got:>12.4f}  "
               f"{'' if good else '<-- MISMATCH'}")
 
     # The rule as coded must match the rule as recorded in the held-out run.
