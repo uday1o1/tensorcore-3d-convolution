@@ -1,0 +1,35 @@
+MedNeXt-B, patch 96^3, NVIDIA GeForce RTX 3090
+support is the full nonzero extent; mass50 and mass90 are the widths holding
+that fraction of gradient magnitude
+
+placement    theoretical  support  mass90  mass50  retuned
+3-3-3-3              151       96      59      21        0  (support clipped)
+3-3-5-5              271       96      70      27       12  (support clipped)
+3-5-5-7              371       96      73      29       17  (support clipped)
+5-5-5-5              301       96      67      23       22  (support clipped)
+5-5-3-3              181       96      59      20       10  (support clipped)
+7-5-5-3              231       96      59      21       15  (support clipped)
+
+relative to 3-3-3-3:
+  3-3-3-3    theoretical  1.00x   support  1.00x   mass90  1.00x
+  3-3-5-5    theoretical  1.79x   support  1.00x   mass90  1.19x
+  3-5-5-7    theoretical  2.46x   support  1.00x   mass90  1.24x
+  5-5-5-5    theoretical  1.99x   support  1.00x   mass90  1.14x
+  5-5-3-3    theoretical  1.20x   support  1.00x   mass90  1.00x
+  7-5-5-3    theoretical  1.53x   support  1.00x   mass90  1.00x
+
+dominance claim, 3-5-5-7 against 5-5-5-5 (training step cost 1.32x and 2.00x, results/receptive_field_cost.json):
+  theoretical    371 vs   301   HOLDS
+  support         96 vs    96   UNINFORMATIVE, clipped at the patch boundary
+  mass90          73 vs    67   HOLDS
+  mass50          29 vs    23   HOLDS
+
+  Support reaches the patch boundary, so the gradient reaches
+  the whole input and that measure saturates and cannot rank
+  placements. The theoretical field exceeds this patch, which
+  makes it an unreachable bound here rather than merely a
+  loose one. Compare the mass columns.
+
+  Dominance requires more reach at lower cost. Cost is measured
+  by bench_receptive_field.py; if a reach column above does not
+  hold, the claim must be narrowed to the columns that do.

@@ -1,0 +1,21 @@
+2026-11-03 20:26:40 preflight
+name, driver_version, power.limit [W], power.default_limit [W], clocks.max.sm [MHz]
+NVIDIA GeForce RTX 3090, 595.71.05, 320.00 W, 350.00 W, 2100 MHz
+model name	: Intel(R) Xeon(R) CPU E5-2673 v4 @ 2.30GHz
+2026-11-03 20:26:40 stage preflight complete
+2026-11-03 20:26:40 dependencies
+[32mActivated conda/uv virtual environment at [36m/venv/main[0m
+WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager, possibly rendering your system unusable. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv. Use the --root-user-action option if you know what you are doing and want to suppress this warning.
+WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager, possibly rendering your system unusable. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv. Use the --root-user-action option if you know what you are doing and want to suppress this warning.
+WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager, possibly rendering your system unusable. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv. Use the --root-user-action option if you know what you are doing and want to suppress this warning.
+torch 2.11.0+cu128 cudnn 91900
+2026-11-03 20:28:02 stage deps complete
+2026-11-03 20:28:02 installing trainers
+[32mActivated conda/uv virtual environment at [36m/venv/main[0m
+2026-11-03 20:28:03 smoke test: correctness, then trainer discovery
+  OK   prefer_windowed discriminates across shapes
+
+ALL CORRECT
+8/8 trainers discoverable
+2026-11-03 20:28:12 smoke test passed
+2026-11-03 20:28:12 SETUP COMPLETE

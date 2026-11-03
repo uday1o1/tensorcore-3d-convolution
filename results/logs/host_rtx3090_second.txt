@@ -1,0 +1,4 @@
+name, driver_version, power.limit [W], power.default_limit [W], clocks.max.sm [MHz]
+NVIDIA GeForce RTX 3090, 595.71.05, 320.00 W, 350.00 W, 2100 MHz
+model name	: Intel(R) Xeon(R) CPU E5-2673 v4 @ 2.30GHz
+torch 2.11.0+cu128 cudnn 91900

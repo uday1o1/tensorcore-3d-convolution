@@ -1,0 +1,15 @@
+cuDNN on the authors' conv9 shape
+  host clock + sync per iter (their method): 41.22 TFLOPS
+  CUDA events per iter                     : 40.87 TFLOPS
+  back to back, single sync                : 41.33 TFLOPS
+
+window expansion measured 2.89x, formula predicts 2.89x
+GPU transform: 0.555 ms at 721 GB/s
+
+  im2win kernel alone      :  1.488 ms  (37.0 TFLOPS)
+  + materialization        :  0.555 ms
+  = windowed total         :  2.042 ms
+  cuDNN, single fused call :  1.332 ms
+
+  ratio as published (kernel only): 0.90x
+  ratio with full accounting      : 0.65x

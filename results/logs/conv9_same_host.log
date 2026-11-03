@@ -1,0 +1,25 @@
+== round 1 im2win
+TFLOPS_best 36.9133 TFLOPS_mean 36.1487 GFLOP 55.0377 nonzero 47775744/47775744 checksum 6.89236e+09
+== round 1 cudnn
+run  0 benchmark=True  events best  41.41  back to back  41.72  host best  40.93 TFLOPS  3 kernel(s)
+run  1 benchmark=False events best  41.38  back to back  41.68  host best  40.95 TFLOPS  3 kernel(s)
+== round 2 im2win
+TFLOPS_best 36.4971 TFLOPS_mean 35.8279 GFLOP 55.0377 nonzero 47775744/47775744 checksum 6.85702e+09
+== round 2 cudnn
+run  0 benchmark=True  events best  41.25  back to back  41.39  host best  40.81 TFLOPS  3 kernel(s)
+run  1 benchmark=False events best  41.50  back to back  41.43  host best  41.07 TFLOPS  3 kernel(s)
+== round 3 im2win
+TFLOPS_best 36.4247 TFLOPS_mean 35.9347 GFLOP 55.0377 nonzero 47775744/47775744 checksum 6.87891e+09
+== round 3 cudnn
+run  0 benchmark=True  events best  41.38  back to back  41.46  host best  40.73 TFLOPS  3 kernel(s)
+run  1 benchmark=False events best  41.34  back to back  41.53  host best  41.21 TFLOPS  3 kernel(s)
+== round 4 im2win
+TFLOPS_best 36.3285 TFLOPS_mean 32.1425 GFLOP 55.0377 nonzero 47775744/47775744 checksum 6.86132e+09
+== round 4 cudnn
+run  0 benchmark=True  events best  41.34  back to back  41.41  host best  40.67 TFLOPS  3 kernel(s)
+run  1 benchmark=False events best  41.00  back to back  41.44  host best  40.60 TFLOPS  3 kernel(s)
+== round 5 im2win
+TFLOPS_best 36.6918 TFLOPS_mean 36.1013 GFLOP 55.0377 nonzero 47775744/47775744 checksum 6.86552e+09
+== round 5 cudnn
+run  0 benchmark=True  events best  41.31  back to back  41.25  host best  40.61 TFLOPS  3 kernel(s)
+run  1 benchmark=False events best  41.31  back to back  41.24  host best  40.72 TFLOPS  3 kernel(s)

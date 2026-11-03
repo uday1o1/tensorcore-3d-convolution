@@ -1,0 +1,43 @@
+run  0 benchmark=True  events best  41.38  back to back  41.60  host best  40.91 TFLOPS  3 kernel(s)
+run  1 benchmark=True  events best  41.28  back to back  41.53  host best  40.82 TFLOPS  3 kernel(s)
+run  2 benchmark=True  events best  41.34  back to back  41.43  host best  40.89 TFLOPS  3 kernel(s)
+run  3 benchmark=True  events best  41.34  back to back  41.24  host best  40.63 TFLOPS  3 kernel(s)
+run  4 benchmark=True  events best  41.41  back to back  41.79  host best  41.16 TFLOPS  3 kernel(s)
+run  5 benchmark=True  events best  41.41  back to back  41.81  host best  41.10 TFLOPS  3 kernel(s)
+run  6 benchmark=True  events best  41.38  back to back  41.75  host best  41.06 TFLOPS  3 kernel(s)
+run  7 benchmark=True  events best  41.38  back to back  41.63  host best  40.91 TFLOPS  3 kernel(s)
+run  8 benchmark=True  events best  41.34  back to back  41.67  host best  40.86 TFLOPS  3 kernel(s)
+run  9 benchmark=True  events best  41.38  back to back  41.61  host best  40.91 TFLOPS  3 kernel(s)
+run 10 benchmark=True  events best  41.38  back to back  41.56  host best  40.88 TFLOPS  3 kernel(s)
+run 11 benchmark=True  events best  41.38  back to back  41.61  host best  40.92 TFLOPS  3 kernel(s)
+run 12 benchmark=True  events best  41.34  back to back  41.54  host best  40.66 TFLOPS  3 kernel(s)
+run 13 benchmark=True  events best  41.38  back to back  41.66  host best  40.88 TFLOPS  3 kernel(s)
+run 14 benchmark=True  events best  41.38  back to back  41.66  host best  40.65 TFLOPS  3 kernel(s)
+run 15 benchmark=True  events best  41.34  back to back  41.64  host best  40.87 TFLOPS  3 kernel(s)
+run 16 benchmark=True  events best  41.34  back to back  41.67  host best  40.83 TFLOPS  3 kernel(s)
+run 17 benchmark=True  events best  41.41  back to back  41.50  host best  40.68 TFLOPS  3 kernel(s)
+run 18 benchmark=True  events best  41.31  back to back  41.43  host best  40.67 TFLOPS  3 kernel(s)
+run 19 benchmark=True  events best  41.15  back to back  41.51  host best  40.50 TFLOPS  3 kernel(s)
+run 20 benchmark=False events best  41.38  back to back  42.20  host best  41.05 TFLOPS  3 kernel(s)
+run 21 benchmark=False events best  41.28  back to back  41.39  host best  40.65 TFLOPS  3 kernel(s)
+run 22 benchmark=False events best  41.28  back to back  41.80  host best  40.60 TFLOPS  3 kernel(s)
+run 23 benchmark=False events best  41.25  back to back  41.44  host best  40.60 TFLOPS  3 kernel(s)
+run 24 benchmark=False events best  41.38  back to back  41.27  host best  41.29 TFLOPS  3 kernel(s)
+
+cudnn.benchmark=True, 20 processes
+  events_best_tflops     min  41.15  median  41.38  max  41.41  (Im2win kernel / cuDNN at median 0.89)
+  back_to_back_tflops    min  41.24  median  41.61  max  41.81  (Im2win kernel / cuDNN at median 0.89)
+  host_best_tflops       min  40.50  median  40.87  max  41.16  (Im2win kernel / cuDNN at median 0.91)
+  20 process(es), events best 41.15 to 41.41:
+      sm86_xmma_fprop_implicit_gemm_f16f16_f16f32_f32_nhwckrsc_nhwc_tilesize128x64x32_stage4_warpsize2x2x1_g1_tensor
+      void cudnn::engines_precompiled::nchwToNhwcKernel<__half, __half, float, false, true, (cudnnKernelDataType_t)0
+      void cudnn::engines_precompiled::nhwcToNchwKernel<__half, __half, float, true, false, (cudnnKernelDataType_t)0
+
+cudnn.benchmark=False, 5 processes
+  events_best_tflops     min  41.25  median  41.28  max  41.38  (Im2win kernel / cuDNN at median 0.90)
+  back_to_back_tflops    min  41.27  median  41.44  max  42.20  (Im2win kernel / cuDNN at median 0.89)
+  host_best_tflops       min  40.60  median  40.65  max  41.29  (Im2win kernel / cuDNN at median 0.91)
+   5 process(es), events best 41.25 to 41.38:
+      sm86_xmma_fprop_implicit_gemm_f16f16_f16f32_f32_nhwckrsc_nhwc_tilesize128x64x32_stage4_warpsize2x2x1_g1_tensor
+      void cudnn::engines_precompiled::nchwToNhwcKernel<__half, __half, float, false, true, (cudnnKernelDataType_t)0
+      void cudnn::engines_precompiled::nhwcToNchwKernel<__half, __half, float, true, false, (cudnnKernelDataType_t)0

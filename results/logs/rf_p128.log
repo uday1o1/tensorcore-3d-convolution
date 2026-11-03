@@ -1,0 +1,20 @@
+MedNeXt-B, patch 128^3, batch 2, NVIDIA GeForce RTX 3090
+
+placement     params M    GFLOPs  infer ms  train ms  train GB  RF vox
+3-3-3-3          10.53     709.8     237.0     587.3     20.13     151
+3-3-5-5          10.81     718.5     245.5     635.3     20.14     271
+3-5-5-7          11.35     749.8     269.9     790.6     20.14     371
+5-5-5-5          10.86     854.1     350.2    1331.6     20.14     301
+5-5-3-3          10.57     845.4     345.7    1290.9     20.13     181
+7-5-5-3          10.67    1093.6     505.6    2313.9     20.14     231
+
+relative to 3-3-3-3:
+  3-3-3-3      FLOPs  1.00x   train time  1.00x   memory  1.00x   receptive field  1.00x
+  3-3-5-5      FLOPs  1.01x   train time  1.08x   memory  1.00x   receptive field  1.79x
+  3-5-5-7      FLOPs  1.06x   train time  1.35x   memory  1.00x   receptive field  2.46x
+  5-5-5-5      FLOPs  1.20x   train time  2.27x   memory  1.00x   receptive field  1.99x
+  5-5-3-3      FLOPs  1.19x   train time  2.20x   memory  1.00x   receptive field  1.20x
+  7-5-5-3      FLOPs  1.54x   train time  3.94x   memory  1.00x   receptive field  1.53x
+
+The accuracy axis comes from the training runs; this file is the
+cost axis they are plotted against.
