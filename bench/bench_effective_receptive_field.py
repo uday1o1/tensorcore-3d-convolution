@@ -20,7 +20,7 @@ spatial extent of nonzero input gradient. Reported two ways:
   support   the full extent of any nonzero gradient, comparable to the
             theoretical bound
   mass      the width containing a fixed fraction of total gradient magnitude,
-            which is the honest measure of what the network actually weights
+            which measures what the network weights
 
 Weights are the initialization, not a trained network. This measures the
 architecture's reach, not what training does with it, which is the right

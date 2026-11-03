@@ -16,7 +16,7 @@ buffer against the output gradient:
     dfilters  = W^T @ dout
 
 So across a training step the materialization is paid once and consumed twice.
-Under the arithmetic intensity account that governs every other result here,
+Under the arithmetic intensity account that the other results here are consistent with,
 the quantity deciding the trade is compute per materialized byte, and that
 quantity roughly doubles when the buffer serves both passes.
 

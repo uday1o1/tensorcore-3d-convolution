@@ -15,7 +15,7 @@ the scripts in `bench/` are their consolidated form.
 |---|---|
 | `im2win_conv9_authors_harness_50it.log` | Im2win's released Tensor Core kernel on conv9 in the authors' harness, best of 50: 37087.4 GFLOPS |
 | `authors_harness_source_50it.log` | the authors' harness source: 50 timed iterations, window transform outside the timing loop |
-| `sweep_harness_source_30it.log` | the command that wrote the base sweep harness (30 timed iterations); `bench/sweep_convs.cpp` is that harness with the output check of `sweep_nonzero_check.log` and the mean of `im2win_conv9_best_mean_30it.log` added |
+| `sweep_harness_source_30it.log` | the command that wrote the base sweep harness (30 timed iterations); `bench/sweep_convs.cpp` is that harness without its local `tensorDimensions` struct (Im2win's `Im2win_bchw.hpp` defines it), with the output check of `sweep_nonzero_check.log` and the mean of `im2win_conv9_best_mean_30it.log` added |
 | `im2win_conv9_best_mean_30it.log` | conv9 in the sweep harness: 37.0375 TFLOPS best, 36.4182 mean, output fully populated |
 | `cudnn_conv9_events_best_of_50.log` | cuDNN on conv9, CUDA events, best of 50: 2.314 ms, 23.8 TFLOPS; kernel-only ratio 1.56 |
 | `cudnn_conv9_three_methods.log` | cuDNN on conv9 by host clock, CUDA events and back to back: 22.96, 23.78, 23.24 TFLOPS |
@@ -36,7 +36,7 @@ the scripts in `bench/` are their consolidated form.
 | `dimscale_materialization.log` | 3D with `k` against `k^2` materialization: 0.654 and 0.429, per layer 0.22 to 0.96 |
 | `nnunet_flops_conv_share.log` | nnU-Net 3D at base width 30: 422.1 G multiply-accumulates (fvcore's FLOP count), 99.6 percent in convolution including transposed convolution |
 | `mednext_conv1_flops_first.log`, `mednext_conv1_and_nnunet_profile.log` | MedNeXt depthwise `conv1` share of FLOPs, 6.2 percent; nnU-Net inference profile, convolution 65.6, normalization 13.6, layout conversion and memory copies 12.2 percent |
-| `layout_conversion_shares.log` | layout conversion share of inference time per configuration |
+| `layout_conversion_shares.log` | layout conversion and memory copy share of GPU time for one forward convolution at three layer shapes, cuDNN against windowed |
 | `nnunet_plans_patch_batch.log` | nnU-Net plans for MSD Liver: 3D batch 2, patch 128 cubed; 2D batch 16, patch 512 |
 | `nnunet_preprocessed_131_volumes.log` | 131 preprocessed training volumes |
 | `end_to_end_substitution.log` | windowed substitution into nnU-Net 3D on identical weights: 27 `Conv3d` layers, 22 windowed; rel_err 1.18e-06; cuDNN 53.4 ms and 1.31 GB against windowed 125.0 ms and 5.07 GB |

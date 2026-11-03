@@ -4,7 +4,7 @@ Correctness verification for every convolution implementation in src/.
 This exists because the failure mode observed in the published kernels this
 project reproduces is SILENT: they return zero or partially computed output
 with no error raised. Timing such a launch measures nothing: on one shape it
-gave 13,483 TFLOPS on an RTX 3090, roughly 95 times the device's 142 TFLOPS
+gave 13,484 TFLOPS on an RTX 3090, roughly 95 times the device's 142 TFLOPS
 dense FP16 Tensor Core peak. Every implementation the benchmarks in bench/
 time is checked here on representative shapes; the timing scripts do not
 re-check each configuration, so run this first.

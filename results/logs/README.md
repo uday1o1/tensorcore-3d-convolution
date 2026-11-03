@@ -1,7 +1,9 @@
 # Raw run logs
 
-Verbatim console output (stdout and stderr) from the runs that produced the reported numbers, kept because
-a log is the authentic record of what was executed and when. The Part I
+Verbatim output from the runs that produced the reported numbers (console
+stdout and stderr for the benchmarks and the pilot runs, nnU-Net's own training
+logs for the trained runs), kept because a log is the authentic record of what
+was executed and when. The Part I
 measurements made with short inline scripts (the Im2win reproduction, the
 generality audit, correctness, dimensional scaling, FFT, profiling and the
 whole-network substitution) are in `measurements/`, indexed in its own README.
@@ -22,9 +24,18 @@ whole-network substitution) are in `measurements/`, indexed in its own README.
 
 `bench_dispatch_network.py` writes `../dispatch_network.json`; the two
 `netdispatch` runs have no committed JSON, so their numbers live in these logs.
-`disp4090.log` validates its preflight table against the RTX 3090 reference
-values; that affects only the gate, not the measurement, since the held-out
-comparison times both algorithms directly.
+`dispatch.log` and `disp4090.log` both check their preflight against fixed
+RTX 3090 ratios (0.63, 1.45, 0.84, 1.28, 0.62, the same winners as
+`../crossover_map_rtx3090.json`, which gives 0.65, 1.42, 0.84, 1.28, 0.65), not
+against the device's own map; that affects only the gate, not the measurement,
+since the held-out comparison times both algorithms directly.
+
+The `rtx3090` and `rtx4090` crossover, held-out and training sweep files were
+measured with cuDNN timed before the windowed path throughout. The committed
+scripts alternate which path goes first, so rerunning them repeats these
+measurements with the order balanced; the fixed-order scripts are
+`git show 504759c^:bench/bench_crossover.py` and likewise for
+`bench_dispatch.py` and `bench_training_crossover.py`.
 
 ## Training
 
@@ -52,7 +63,7 @@ continued runs need the kernel 3 run's final checkpoint, so it trains first.
 
 ## Hosts
 
-PyTorch 2.11.0+cu128 (CUDA 12.8) with cuDNN 9.19.0 on every host, so that
+PyTorch 2.11.0+cu128 (CUDA 12.8) with cuDNN 9.19.0 on each of the hosts below, so that
 cross-device differences are not library version; they remain host as well as
 GPU differences.
 
@@ -60,7 +71,8 @@ GPU differences.
   (`measurements/host_rtx3090_main_versions.log`).
 - RTX 4090 benchmark host: sm_89, 128 SMs; versions recorded in each row of the
   `rtx4090` JSON files.
-- Second RTX 4090 host, also the RTX 4090 training host: driver 580.95.05, AMD
-  EPYC 7742, 400 W power limit (`../host2/host.txt`).
+- Second RTX 4090 host: driver 580.95.05, AMD EPYC 7742, 400 W power limit
+  (`../host2/host.txt`), the same record as the RTX 4090 training host
+  (`../validation/training_host_rtx4090.txt`).
 - RTX 3090 training host: driver 580.126.09, AMD Ryzen 9 5950X, 320 W power
   limit (`../validation/training_host_rtx3090.txt`).

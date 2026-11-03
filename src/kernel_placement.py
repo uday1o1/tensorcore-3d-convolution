@@ -9,8 +9,8 @@ Two facts from MedNeXt's own paper shape this module:
 
   1. Large kernel MedNeXts trained from scratch fail to perform. Their kernel 5
      model scores 84.03 on BTCV from scratch against 84.23 with UpKern
-     initialization, and without UpKern large kernel performance is
-     indistinguishable from small kernels. Any placement study that trains from
+     initialization, and without UpKern the kernel 5 model scores 84.03
+     against 84.01 at kernel 3. Any placement study that trains from
      scratch therefore risks measuring an optimization failure and reporting it
      as "receptive field does not help".
   2. The benefit being chased is roughly 0.2 Dice points (0.002 as a

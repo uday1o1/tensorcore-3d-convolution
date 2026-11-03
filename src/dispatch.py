@@ -3,7 +3,8 @@
 The crossover map (bench/bench_crossover.py) establishes that neither algorithm
 dominates: measured as a geometric mean over the RTX 3090 grid, always-cuDNN
 sits 1.132x off a perfect oracle and always-windowed sits 1.160x off. Which one wins is a
-function of layer shape, and it is predictable.
+function of layer shape, and on the device the rule was read from it is
+predictable from shape alone.
 
 That makes the practical artifact a dispatcher rather than a replacement. This
 module implements two policies:
@@ -13,7 +14,8 @@ module implements two policies:
 
 The autotuner chooses each shape's faster path from its own timings, so it is
 the measured reference the rule is compared with on whole networks. Its choice
-is only as good as one timing of each path, it pays a probing cost on first
+is only as good as a single probe of each path (the median of five batches of
+ten calls, taken once per shape), it pays a probing cost on first
 sight of each shape, and it can only choose for shapes it actually encounters.
 Its probe can pick the slower path: on whole networks at kernel sizes 3 and 5
 it lands below the rule (0.939x and 0.908x of cuDNN against 0.986x and 0.994x,
@@ -23,7 +25,7 @@ The rule is deliberately three threshold clauses, not a fitted surface. A
 closed form is not justified here: the ratio is a quotient of two
 shape-dependent efficiencies, and cuDNN's own efficiency varies with shape, so
 a formula fitted to the windowed side alone would be overfitted to one GPU.
-Clause 1 held in all 12 grid shapes on both GPUs and in 7 of 8 held-out shapes
+Clause 1 held on the median in all 12 grid shapes on both GPUs and in 7 of 8 held-out shapes
 on the RTX 3090 (results/dispatch_heldout_rtx3090.json, the eighth at 1.009)
 and all 8 on the RTX 4090; clauses 2 and 3 are
 thresholds read off the RTX 3090 grid and do not transfer unchanged to the
@@ -44,8 +46,8 @@ def prefer_windowed(channels, spatial, kernel_size):
 
     Returns True when the windowed path is expected to beat cuDNN.
 
-    Clause 1 excludes kernel size 3, where windowed lost in all 12 shapes
-    measured. Clause 2 admits wide layers at kernel size 5 and above, where it
+    Clause 1 excludes kernel size 3, where windowed lost in all 12 grid
+    shapes (and 7 of 8 held-out shapes on the RTX 3090). Clause 2 admits wide layers at kernel size 5 and above, where it
     won in 11 of 12 on the RTX 3090, the twelfth at parity (0.997).
 
     Clause 3 admits large kernels generally and is the weak one: it holds in

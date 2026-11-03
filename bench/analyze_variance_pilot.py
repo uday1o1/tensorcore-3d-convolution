@@ -1,7 +1,7 @@
 """How much of a measured architectural difference is just the seed?
 
 Takes two or more training runs of one identical configuration, differing only
-in random seed, and reports every pairwise comparison between them. The spread
+in random state (seed and augmentation stream), and reports every pairwise comparison between them. The spread
 is the noise floor of this training setup: any claim that one architecture beats
 another has to clear it.
 
@@ -12,7 +12,7 @@ placement study chases.
 
 WHY EVERY PAIR, NOT JUST ONE. With two runs there is a single comparison, which
 can show that a false positive is possible but not how often it occurs, and an
-unlucky draw is the obvious objection. Three runs give three comparisons and a
+unlucky draw is the obvious objection. More runs give more comparisons and a
 rate.
 
 WHICH NUMBER TO COMPARE. nnU-Net logs an "Average global foreground Dice" every
@@ -29,7 +29,7 @@ against a known null, it should not find anything.
 
 Usage:
   python analyze_variance_pilot.py <summary1.json> <summary2.json> [more...]
-  python analyze_variance_pilot.py          # seeds 1-5 found under $RESULTS_FOLDER
+  python analyze_variance_pilot.py          # seed runs found under $RESULTS_FOLDER
 """
 import itertools
 import json

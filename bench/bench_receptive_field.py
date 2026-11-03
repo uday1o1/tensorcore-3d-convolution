@@ -44,9 +44,10 @@ training memory, and the theoretical receptive field in voxels.
 
 Usage:  python bench_receptive_field.py
 
-The committed results/receptive_field_cost.json keeps the cost fields and the
-GPU name only; the receptive field values the write-up quotes come from
-results/effective_receptive_field.json.
+The committed results/receptive_field_cost.json keeps the placement, its
+kernels, the cost fields, the retuned-layer count and the GPU name, and no
+receptive field values; the receptive field values the write-up quotes come
+from results/effective_receptive_field.json.
 """
 import json
 import sys

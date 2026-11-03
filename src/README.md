@@ -6,8 +6,9 @@ the baselines it is compared against.
 The published Im2win kernels this project reproduces are hand-specialized per
 benchmark layer: their launch geometry contains literal constants (conv9 uses
 `dim3(CEIL_DIV(M, TLIE_M_PER_BLOCK), 18, 54 * 6)`, where 54 is that layer's output height),
-and at seven of the eight other shapes we tested they return silently zero
-or partially computed output.
+and the conv9 kernel, run at eight single-parameter variations of its
+benchmark shape, returns silently zero or partially computed output at seven of
+them.
 There is therefore no general implementation to port, and this code is a
 from-scratch general implementation rather than an adaptation.
 
@@ -88,15 +89,16 @@ Two traps this code is built around:
 
 1. **Silent wrongness.** The failure mode of the kernels being studied is
    returning zeros with no error. Verify output, not just runtime. A sweep
-   with no output check reported 13,483 TFLOPS, roughly 95x the RTX 3090's
+   with no output check reported 13,484 TFLOPS, roughly 95x the RTX 3090's
    142 TFLOPS dense FP16 Tensor Core peak, which is what timing an empty
    launch measures (`results/logs/measurements/sweep_unverified_nnunet_shapes.log`).
 2. **TF32.** PyTorch enables it by default for cuDNN convolutions on Ampere and later. Its 10-bit mantissa
-   produces relative errors of 2.65e-04 to 5.55e-04 here, which look like
-   algorithmic bugs (`results/logs/measurements/winconv_correctness_tf32_on.log`).
+   produces relative errors up to 5.55e-04 here (2.65e-04 to 5.55e-04 in the
+   four cases that fail), which look like algorithmic bugs (`results/logs/measurements/winconv_correctness_tf32_on.log`).
    Disable it when verifying, or precision gets misattributed to correctness.
 
-With TF32 disabled, every implementation here matches `F.conv2d` / `F.conv3d`
+With TF32 disabled, the windowed (2D, 3D, minimal, depthwise), FFT and
+`WindowedConv3d` implementations match `F.conv2d` / `F.conv3d`
 to a relative error between 0.00e+00 and 2.42e-06 in the committed correctness
 logs (`results/logs/measurements/*correctness*.log`).
 

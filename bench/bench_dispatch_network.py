@@ -9,7 +9,7 @@ This benchmark asks the question the map actually poses. A dispatcher has to
 clear two bars to be worth anything:
 
   1. do no harm. On a kernel size 3 network, where the windowed path loses in
-     all 12 grid shapes, the dispatcher must match cuDNN. If it regresses
+     all 12 grid shapes on the median, the dispatcher must match cuDNN. If it regresses
      here it is unusable, because small kernels are the common case.
   2. win where the map says it should. On a large kernel network, the
      dispatcher must beat cuDNN.

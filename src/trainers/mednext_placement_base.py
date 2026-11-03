@@ -9,8 +9,8 @@ from a trained kernel-3 checkpoint by UpKern.
 
 Why UpKern rather than training from scratch: MedNeXt's paper reports that
 large kernel MedNeXts trained from scratch fail to perform, scoring 84.03 on
-BTCV against 84.23 with UpKern, and that without it large kernel performance is
-indistinguishable from small kernels. Training these placements from scratch
+BTCV against 84.23 with UpKern, and without it the kernel 5 model scores 84.03
+against 84.01 at kernel 3. Training these placements from scratch
 would risk measuring an optimization failure and reporting it as evidence that
 receptive field does not help, which is the wrong conclusion from the right
 number.
