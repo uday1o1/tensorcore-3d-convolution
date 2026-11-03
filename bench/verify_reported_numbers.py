@@ -59,7 +59,7 @@ CLAIMED = {
     "pilot, tumor spread": "0.0407",
     "pilot, liver spread": "0.0005",
     "pilot, tumor paired p": "0.049",
-    # Measurement audit: two sessions per host, one host per GPU
+    # Measurement audit: two sessions per GPU, the two GPUs on different hosts
     "audit, 3090 session winner changes": 4,
     "audit, 4090 session winner changes": 2,
     "audit, 3090 session median offset": "0.990",

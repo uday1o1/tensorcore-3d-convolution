@@ -127,7 +127,7 @@ def session_agreement(maps, trains):
 def same_gpu_two_hosts(agree):
     """Separate the GPU from the host, using a second RTX 4090 host.
 
-    The two-device comparison had one host per GPU, so a winner change between
+    The two-device comparison ran the two GPUs on different hosts, so a winner change between
     the RTX 3090 and RTX 4090 results could be either. results/host2/ holds two
     crossover sessions on a different RTX 4090 host. Winner changes between the
     two RTX 4090 hosts are host effects with the GPU held fixed; if they are as
@@ -280,8 +280,8 @@ def main():
                   f"{len(naive)}/{len(cells)}")
             print(f"  ...counting only cells both sessions agree on, on both: "
                   f"{len(robust)}/{len(cells)}")
-            print("  One host per GPU in this comparison, so these are differences"
-                  "\n  between two hosts; the second RTX 4090 host below separates the"
+            print("  The two GPUs ran on different hosts, so these are differences"
+                  "\n  between hosts as well as GPUs; the second RTX 4090 host below separates the"
                   "\n  GPU from the host.")
         for tag, a in agree.items():
             r2 = [k for k in a["cells"] if k[0] >= 240 and k[2] >= 5]

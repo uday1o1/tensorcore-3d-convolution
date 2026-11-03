@@ -58,7 +58,7 @@ not beat cuDNN at kernel size 5 (0.994x, where an autotuner reaches 0.908x) and
 regresses at kernel size 9 to 0.819x where an autotuner reaches 1.025x. And on a second
 machine, an RTX 4090 host against the RTX 3090 host, 13 of the 54
 configurations that two independent sessions on each host agree on change
-winner. The clause that looked strongest on the first machine (240 channels,
+winner. The clause that looked strongest on the RTX 3090 (240 channels,
 kernel size 5 or above, 11 of 12 grid cells) holds in only 8 of 12 grid cells
 and 3 of 6 held-out cells on the second, and on held-out shapes the rule's
 advantage over simply calling cuDNN falls from 8.25% to 0.01%. A second RTX
