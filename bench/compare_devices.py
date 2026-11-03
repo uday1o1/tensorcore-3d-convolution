@@ -93,11 +93,11 @@ def smallest_crossing(rows, key="ratio"):
 
 
 def session_agreement(maps, trains):
-    """Do two independent sessions on the same host agree on each winner?
+    """Do two independent sessions on the same GPU agree on each winner?
 
     Each device's forward convolutions were measured twice: once in the
     crossover sweep and once as the forward-only timing in the training sweep.
-    Same shapes, same host, different session. Within-session
+    Same shapes, same GPU, different session. Within-session
     trial spread cannot reveal session-to-session variation, since a
     consistently biased session is also consistent. Agreement between the two
     sessions can.
@@ -249,17 +249,17 @@ def main():
             print(f"  {name:<26}{c:>8.2f}{w:>10.2f}   {who}")
         print("  On the committed RTX 3090 and RTX 4090 maps the two gain almost"
               "\n  equally overall, so the surface does not move"
-              "\n  because one algorithm is uniformly better served by newer silicon."
-              "\n  It moves because the gain is redistributed by shape: cuDNN gains"
-              "\n  more at 240 channels, which is where the rule selects, and the"
-              "\n  windowed path gains more at 120 channels, which is where cells"
-              "\n  flip toward it.")
+              "\n  as if one algorithm were uniformly better served by newer silicon."
+              "\n  It moves with how the gain is distributed by shape: cuDNN gains"
+              "\n  more at 240 and 60 channels, where settled cells are lost, and the"
+              "\n  windowed path gains more at 120 channels, where they are gained;"
+              "\n  at 30 channels cuDNN also gains more and no settled cell changes.")
 
     # Session agreement: the measure that within-session spread cannot give.
     trains_all = load("training_crossover")
     agree = session_agreement(maps, trains_all)
     if agree:
-        print("\nSESSION AGREEMENT, same host, same convolutions, two sessions")
+        print("\nSESSION AGREEMENT, same GPU, same convolutions, two sessions")
         print(f"  {'device':<10}{'offset':>9}{'median dev':>12}{'p90 dev':>9}"
               f"{'winner changes':>16}")
         for tag, a in agree.items():

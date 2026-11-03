@@ -5,7 +5,7 @@ forward pass only. The cost that actually constrains large kernel 3D
 architectures is training cost, and there is a structural reason to expect the
 two to differ.
 
-The windowed method loses because it materializes a buffer that implicit GEMM
+The windowed method's distinguishing cost is a buffer that implicit GEMM
 never builds. In the forward pass that buffer is built once and consumed once:
 
     out       = W  @ filters

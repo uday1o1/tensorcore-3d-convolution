@@ -3,8 +3,8 @@
 Shape-generic windowed convolution for two and three spatial dimensions, plus
 the baselines it is compared against.
 
-The published Im2win kernels this project reproduces are hand-specialized per
-benchmark layer: their launch geometry contains literal constants (conv9 uses
+The released Im2win kernels whose launch grids we recorded (conv4, conv9,
+conv11) use hardcoded grid dimensions (conv9 uses
 `dim3(CEIL_DIV(M, TLIE_M_PER_BLOCK), 18, 54 * 6)`, where 54 is that layer's output height),
 and the conv9 kernel, run at eight single-parameter variations of its
 benchmark shape, returns silently zero or partially computed output at seven of
@@ -93,8 +93,8 @@ Two traps this code is built around:
    142 TFLOPS dense FP16 Tensor Core peak, which is what timing an empty
    launch measures (`results/logs/measurements/sweep_unverified_nnunet_shapes.log`).
 2. **TF32.** PyTorch enables it by default for cuDNN convolutions on Ampere and later. Its 10-bit mantissa
-   produces relative errors up to 5.55e-04 here (2.65e-04 to 5.55e-04 in the
-   four cases that fail), which look like algorithmic bugs (`results/logs/measurements/winconv_correctness_tf32_on.log`).
+   produces relative errors of 2.65e-04 to 5.55e-04 in the four cases that
+   fail here, which look like algorithmic bugs (`results/logs/measurements/winconv_correctness_tf32_on.log`).
    Disable it when verifying, or precision gets misattributed to correctness.
 
 With TF32 disabled, the windowed (2D, 3D, minimal, depthwise), FFT and

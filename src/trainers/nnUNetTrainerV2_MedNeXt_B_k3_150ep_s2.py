@@ -41,7 +41,7 @@ class nnUNetTrainerV2_MedNeXt_B_k3_150ep_s2(nnUNetTrainerV2_MedNeXt_B_kernel3):
         if torch.cuda.is_available():
             torch.cuda.manual_seed_all(SEED)
         # This text reproduces the committed training logs verbatim. Its
-        # parenthesis is loose: nnU-Net seeds 12345 only when run with
-        # --deterministic and sets no seed otherwise.
+        # parenthesis is loose: nnU-Net seeds the global numpy and torch
+        # generators with 12345 only when run with --deterministic.
         self.print_to_log_file(f"variance pilot: reseeded to {SEED} "
                                f"(nnU-Net default is 12345)")

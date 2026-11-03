@@ -7,8 +7,8 @@ while windowed materialization grows only linearly in k, so the curves cross
 at large kernel sizes.
 
 Reports the MEDIAN of repeated trials, and also the per-trial ratio spread.
-cuDNN shows real run-to-run variance in algorithm selection, so single
-measurements here are not trustworthy.
+cuDNN timings vary from run to run, so single measurements here are not
+trustworthy.
 
 The spread is recorded because a median above 1.0 does not show that a cell
 wins in every trial; a cell whose worst trial is also above 1.0 does.

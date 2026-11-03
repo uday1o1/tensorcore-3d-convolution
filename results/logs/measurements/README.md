@@ -36,7 +36,7 @@ the scripts in `bench/` are their consolidated form.
 | `dimscale_materialization.log` | 3D with `k` against `k^2` materialization: 0.654 and 0.429, per layer 0.22 to 0.96 |
 | `nnunet_flops_conv_share.log` | nnU-Net 3D at base width 30: 422.1 G multiply-accumulates (fvcore's FLOP count), 99.6 percent in convolution including transposed convolution |
 | `mednext_conv1_flops_first.log`, `mednext_conv1_and_nnunet_profile.log` | MedNeXt depthwise `conv1` share of FLOPs, 6.2 percent; nnU-Net inference profile, convolution 65.6, normalization 13.6, layout conversion and memory copies 12.2 percent |
-| `layout_conversion_shares.log` | layout conversion and memory copy share of GPU time for one forward convolution at three layer shapes, cuDNN against windowed |
+| `layout_conversion_shares.log` | layout conversion and memcpy/memset share of GPU time for one forward convolution at three layer shapes, cuDNN against windowed |
 | `nnunet_plans_patch_batch.log` | nnU-Net plans for MSD Liver: 3D batch 2, patch 128 cubed; 2D batch 16, patch 512 |
 | `nnunet_preprocessed_131_volumes.log` | 131 preprocessed training volumes |
 | `end_to_end_substitution.log` | windowed substitution into nnU-Net 3D on identical weights: 27 `Conv3d` layers, 22 windowed; rel_err 1.18e-06; cuDNN 53.4 ms and 1.31 GB against windowed 125.0 ms and 5.07 GB |

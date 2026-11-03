@@ -67,8 +67,9 @@ PyTorch 2.11.0+cu128 (CUDA 12.8) with cuDNN 9.19.0 on each of the hosts below, s
 cross-device differences are not library version; they remain host as well as
 GPU differences.
 
-- RTX 3090 benchmark host: driver 595.71.05
-  (`measurements/host_rtx3090_main_versions.log`).
+- RTX 3090 host of the Part I measurement logs: driver 595.71.05
+  (`measurements/host_rtx3090_main_versions.log`); the `rtx3090` benchmark
+  files carry no host record.
 - RTX 4090 benchmark host: sm_89, 128 SMs; versions recorded in each row of the
   `rtx4090` JSON files.
 - Second RTX 4090 host: driver 580.95.05, AMD EPYC 7742, 400 W power limit
