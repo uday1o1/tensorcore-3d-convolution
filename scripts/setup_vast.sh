@@ -6,6 +6,8 @@
 # variables, so it runs unchanged on any machine.
 #
 #   scripts/setup_vast.sh launch setup          provision, detached, resumable
+#   scripts/setup_vast.sh launch setup-bench    the same without the dataset,
+#                                               for the GPU benchmarks only
 #   scripts/setup_vast.sh launch train <T> [<T> ...]  train in sequence, detached
 #   scripts/setup_vast.sh status                 what has finished, what is running
 #   source "$WORK/env.sh"                        environment for running anything
@@ -202,6 +204,18 @@ cmd_setup() {
   say "SETUP COMPLETE"
 }
 
+cmd_setup_bench() {
+  # The benchmarks in bench/ need the pinned torch and the MedNeXt fork but
+  # not the dataset, so the dataset stages and their disk check are skipped.
+  MIN_FREE_GB="${MIN_FREE_GB_BENCH:-20}"
+  write_env
+  stage_preflight
+  stage_deps
+  stage_trainers
+  stage_smoke
+  say "SETUP COMPLETE"
+}
+
 cmd_train() {
   local trainer="$1"
   write_env
@@ -254,11 +268,12 @@ case "${1:-}" in
     echo "launched: $* (log $log)"
     ;;
   setup) cmd_setup ;;
+  setup-bench) cmd_setup_bench ;;
   train)
     # A failed run is reported and the sequence moves on, so one bad
     # configuration does not idle the GPU for the rest of the queue.
     [ -n "${2:-}" ] || { echo "usage: $0 train <Trainer> [<Trainer> ...]"; exit 2; }
     shift; for t in "$@"; do cmd_train "$t"; done; say "QUEUE DONE" ;;
   status) cmd_status ;;
-  *) sed -n '2,20p' "$0"; exit 2 ;;
+  *) sed -n '2,22p' "$0"; exit 2 ;;
 esac

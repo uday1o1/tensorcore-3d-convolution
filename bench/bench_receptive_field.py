@@ -42,7 +42,7 @@ cuDNN's depthwise times in results/crossover_map_rtx3090.json:
 Reports per configuration: parameters, FLOPs, measured latency, measured peak
 training memory, and the theoretical receptive field in voxels.
 
-Usage:  python bench_receptive_field.py
+Usage:  python bench_receptive_field.py [--patch 128] [--controls] [--tag NAME]
 
 The committed results/receptive_field_cost.json keeps the placement, its
 kernels, the cost fields, the retuned-layer count and the GPU name, and no
@@ -69,6 +69,14 @@ PLACEMENTS = {
     "3-3-5-5": [3, 3, 5, 5],
     "3-5-5-7": [3, 5, 5, 7],
     "5-5-5-5": [5, 5, 5, 5],
+}
+# Early-placement controls: the deep placements mirrored, so the same kernel
+# sizes sit in the shallow stages instead. A deep placement that beats its
+# mirror on cost at equal enlargement shows that depth, not the number of
+# enlarged layers, sets the price.
+CONTROLS = {
+    "5-5-3-3": [5, 5, 3, 3],
+    "7-5-5-3": [7, 5, 5, 3],
 }
 PATCH = 64
 BATCH = 2
@@ -143,16 +151,28 @@ def build(kernels):
 
 
 def main():
+    import argparse
+    ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
+    ap.add_argument("--patch", type=int, default=PATCH,
+                    help="cubic patch edge in voxels (default 64; training used 128)")
+    ap.add_argument("--controls", action="store_true",
+                    help="also measure the early-placement controls 5-5-3-3 and 7-5-5-3")
+    ap.add_argument("--tag", default="",
+                    help="output receptive_field_cost_<tag>.json instead of "
+                         "receptive_field_cost.json")
+    args = ap.parse_args()
     if not torch.cuda.is_available():
         print("needs a CUDA device")
         return 1
-    x = torch.randn(BATCH, 1, PATCH, PATCH, PATCH, device="cuda")
+    patch = args.patch
+    placements = {**PLACEMENTS, **(CONTROLS if args.controls else {})}
+    x = torch.randn(BATCH, 1, patch, patch, patch, device="cuda")
     rows = []
-    print(f"MedNeXt-B, patch {PATCH}^3, batch {BATCH}, "
+    print(f"MedNeXt-B, patch {patch}^3, batch {BATCH}, "
           f"{torch.cuda.get_device_name(0)}\n")
     print(f"{'placement':<12}{'params M':>10}{'GFLOPs':>10}{'infer ms':>10}"
           f"{'train ms':>10}{'train GB':>10}{'RF vox':>8}")
-    for name, kernels in PLACEMENTS.items():
+    for name, kernels in placements.items():
         try:
             model, changed = build(kernels)
             fl, pr = count_flops_params(model, x)
@@ -164,8 +184,8 @@ def main():
                          "params_m": pr / 1e6, "gflops": fl / 1e9,
                          "infer_ms": inf * 1000, "train_ms": tr * 1000,
                          "train_gb": mem, "receptive_field_voxels": rf,
-                         "layers_retuned": changed,
-                         **device_meta()})
+                         "layers_retuned": changed, "patch": patch,
+                         "batch": BATCH, **device_meta()})
             print(f"{name:<12}{pr/1e6:>10.2f}{fl/1e9:>10.1f}{inf*1000:>10.1f}"
                   f"{tr*1000:>10.1f}{mem:>10.2f}{rf:>8d}")
             del model
@@ -175,8 +195,8 @@ def main():
             print(f"{name:<12}  failed: {type(e).__name__}: {e}")
 
     if rows:
-        json.dump(rows, open(results_dir() / "receptive_field_cost.json", "w"),
-                  indent=1)
+        out = f"receptive_field_cost{'_' + args.tag if args.tag else ''}.json"
+        json.dump(rows, open(results_dir() / out, "w"), indent=1)
         base = next((r for r in rows if r["placement"] == "3-3-3-3"), rows[0])
         print(f"\nrelative to {base['placement']}:")
         for r in rows:

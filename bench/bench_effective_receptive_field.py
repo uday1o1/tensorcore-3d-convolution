@@ -27,7 +27,7 @@ architecture's reach, not what training does with it, which is the right
 quantity for a design question; trained accuracy is in
 results/training_study.json.
 
-Usage:  python bench_effective_receptive_field.py
+Usage:  python bench_effective_receptive_field.py [--controls]
 """
 import json
 import sys
@@ -51,6 +51,13 @@ PLACEMENTS = {
 # here. Support is therefore clipped by the input and carries no information;
 # the mass measures are what can actually be compared. See the clipping check
 # in main().
+# Early-placement controls, the deep placements mirrored (see
+# bench_receptive_field.py). Appended after the study placements, so the
+# networks built before them see the same random state as without --controls.
+CONTROLS = {
+    "5-5-3-3": [5, 5, 3, 3],
+    "7-5-5-3": [7, 5, 5, 3],
+}
 PATCH = 96
 MASS_FRACTIONS = (0.5, 0.9)
 
@@ -113,9 +120,11 @@ def extent_from_profile(prof, fraction=None):
 
 
 def main():
+    controls = "--controls" in sys.argv[1:]
     if not torch.cuda.is_available():
         print("needs a CUDA device")
         return 1
+    placements = {**PLACEMENTS, **(CONTROLS if controls else {})}
     torch.manual_seed(0)
     rows = []
     print(f"MedNeXt-B, patch {PATCH}^3, {torch.cuda.get_device_name(0)}")
@@ -123,7 +132,7 @@ def main():
           "holding\nthat fraction of gradient magnitude\n")
     print(f"{'placement':<12}{'theoretical':>12}{'support':>9}{'mass90':>8}"
           f"{'mass50':>8}{'retuned':>9}")
-    for name, kernels in PLACEMENTS.items():
+    for name, kernels in placements.items():
         try:
             model, changed = build(kernels)
             theo, _ = receptive_field(model, kernels)
@@ -147,8 +156,9 @@ def main():
 
     if not rows:
         return 1
-    json.dump(rows, open(results_dir() / "effective_receptive_field.json", "w"),
-              indent=1)
+    out = ("effective_receptive_field_controls.json" if controls
+           else "effective_receptive_field.json")
+    json.dump(rows, open(results_dir() / out, "w"), indent=1)
 
     base = next(r for r in rows if r["placement"] == "3-3-3-3")
     print(f"\nrelative to {base['placement']}:")
