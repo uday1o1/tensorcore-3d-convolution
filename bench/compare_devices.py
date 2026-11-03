@@ -3,7 +3,7 @@
 The crossover grid, held-out test and training sweep are measured on an RTX
 3090 and repeated on an RTX 4090. The 3090 is the right device for the
 reproduction, since it is the GPU class Im2win's own evaluation used, but
-results from one device are a property of that machine. The
+results from one device are a property of that device and its host. The
 decision rule in src/dispatch.py is the clearest case: its thresholds were read
 off the RTX 3090 grid alone, so they carry whatever that device and the cuDNN
 build for sm_86 favoured.
@@ -282,7 +282,7 @@ def main():
                   f"{len(robust)}/{len(cells)}")
             print("  The two GPUs ran on different hosts, so these are differences"
                   "\n  between hosts as well as GPUs; the second RTX 4090 host below separates the"
-                  "\n  GPU from the host.")
+                  "\n  GPU from the host on the RTX 4090 side.")
         for tag, a in agree.items():
             r2 = [k for k in a["cells"] if k[0] >= 240 and k[2] >= 5]
             k3 = [k for k in a["cells"] if k[2] == 3]

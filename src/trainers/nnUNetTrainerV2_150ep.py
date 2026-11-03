@@ -5,7 +5,7 @@ class nnUNetTrainerV2_150ep(nnUNetTrainerV2):
     same as every MedNeXt trainer here. Two separate trainings use it: the
     network for the identical-weights accuracy check, where windowed and cuDNN
     convolution run on the same trained weights (evaluated on the RTX 3090
-    benchmark host), and the nnU-Net row of the training study (RTX 4090
+    host of the Part I measurement logs), and the nnU-Net row of the training study (RTX 4090
     training host). Absolute Dice need not match published results.'''
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
