@@ -71,8 +71,9 @@ PLACEMENTS = {
     "5-5-5-5": [5, 5, 5, 5],
 }
 # Early-placement controls: the deep placements mirrored, so the same kernel
-# sizes sit in the shallow stages instead. A deep placement that beats its
-# mirror on cost at equal enlargement shows that depth, not the number of
+# sizes sit in the shallow stages instead. The mirrors enlarge fewer layers
+# (the bottleneck takes the deepest stage's kernel), so a deep placement that
+# still costs less than its mirror shows that depth, not the number of
 # enlarged layers, sets the price.
 CONTROLS = {
     "5-5-3-3": [5, 5, 3, 3],

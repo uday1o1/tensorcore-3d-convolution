@@ -22,7 +22,7 @@ whole-network substitution) are in `measurements/`, indexed in its own README.
 | `disp4090.log` | `../dispatch_heldout_rtx4090.json` | `python bench/bench_dispatch.py 5` |
 | `crossover_host2_s1.log`, `crossover_host2_s2.log` | `../host2/crossover_map_s1.json`, `../host2/crossover_map_s2.json`, two sessions on the second RTX 4090 host | `python bench/bench_crossover.py 7`, run twice, renaming the output after each |
 | `cudnn_conv9.log` | `../cudnn_conv9_runs_rtx3090.json`, 25 fresh processes on the second RTX 3090 host | `python bench/bench_cudnn_conv9.py 20` |
-| `conv9_same_host.log` | the released Im2win conv9 kernel and cuDNN alternated five times on the second RTX 3090 host | `for i in 1 2 3 4 5; do ./sweep 256 64 56 56 64 3 1; python bench/bench_cudnn_conv9.py 1; done`, with `sweep` built from `bench/CMakeLists.txt` and the conv9 kernel source |
+| `conv9_same_host.log` | the released Im2win conv9 kernel and cuDNN alternated five times on the second RTX 3090 host | `for i in 1 2 3 4 5; do echo "== round $i im2win"; ./sweep 256 64 56 56 64 3 1; echo "== round $i cudnn"; python bench/bench_cudnn_conv9.py 1 \| grep '^run'; done`, with `sweep` built from `bench/CMakeLists.txt` and the conv9 kernel source; each `bench_cudnn_conv9.py` call rewrites `cudnn_conv9_runs_<gpu>.json`, so run this before the `cudnn_conv9.log` sweep |
 | `reproduce_im2win.log` | kernel-only and full-accounting ratios on conv9, second RTX 3090 host | `python bench/bench_reproduce_im2win.py` |
 | `rf_controls.log` | `../receptive_field_cost_controls.json` | `python bench/bench_receptive_field.py --controls --tag controls` |
 | `rf_p128.log` | `../receptive_field_cost_p128.json` | `python bench/bench_receptive_field.py --controls --patch 128 --tag p128` |
@@ -73,12 +73,12 @@ continued runs need the kernel 3 run's final checkpoint, so it trains first.
 
 PyTorch 2.11.0+cu128 (CUDA 12.8) with cuDNN 9.19.0 on each of the hosts below.
 Cross-device differences remain host as well as GPU differences, and since the
-`rtx3090` benchmark files record no library versions, library version is
+`rtx3090` crossover, held-out and training sweep files record no library versions, library version is
 excluded only as far as those files share the Part I host.
 
 - RTX 3090 host of the Part I measurement logs: driver 595.71.05
-  (`measurements/host_rtx3090_main_versions.log`); the `rtx3090` benchmark
-  files carry no host record.
+  (`measurements/host_rtx3090_main_versions.log`); the `rtx3090` crossover,
+  held-out and training sweep files carry no host record.
 - RTX 4090 benchmark host: sm_89, 128 SMs; versions recorded in each row of the
   `rtx4090` JSON files.
 - Second RTX 4090 host: driver 580.95.05, AMD EPYC 7742, 400 W power limit

@@ -14,7 +14,8 @@ the shape Im2win's conv9 benchmark uses. Throughput counts two operations per
 multiply-accumulate. The Im2win kernel itself is not run here; its 37.0 TFLOPS
 on an RTX 3090 is in results/logs/measurements/im2win_conv9_best_mean_30it.log.
 
-Usage:  python bench_cudnn_conv9.py [processes]      (default 20)
+Usage:  python bench_cudnn_conv9.py [n]   (default 20: n processes with cudnn.benchmark
+        on, then max(1, n // 4) with it off)
 Writes: cudnn_conv9_runs_<gpu>.json in the results directory.
 """
 import json

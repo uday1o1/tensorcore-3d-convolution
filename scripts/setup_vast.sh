@@ -19,7 +19,7 @@
 # freshly written files.
 #
 # Defaults suit the Vast.ai PyTorch image. Override any of them:
-#   WORK=/workspace  VENV=/venv/main  MIN_FREE_GB=100
+#   WORK=/workspace  VENV=/venv/main  MIN_FREE_GB=100  MIN_FREE_GB_BENCH=20
 set -uo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -205,8 +205,10 @@ cmd_setup() {
 }
 
 cmd_setup_bench() {
-  # The benchmarks in bench/ need the pinned torch and the MedNeXt fork but
-  # not the dataset, so the dataset stages and their disk check are skipped.
+  # The benchmarks in bench/, apart from bench_dice_identical_weights.py, need
+  # the pinned torch and the MedNeXt fork but not the dataset, so the dataset
+  # stages are skipped and the preflight disk check asks for
+  # MIN_FREE_GB_BENCH (default 20) instead of MIN_FREE_GB.
   MIN_FREE_GB="${MIN_FREE_GB_BENCH:-20}"
   write_env
   stage_preflight
