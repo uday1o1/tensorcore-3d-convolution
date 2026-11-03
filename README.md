@@ -33,8 +33,9 @@ made cheaper. The second takes the answer as given and asks where the
 convolution is worth spending.
 
 **Part I, windowed convolution.** Presented in the literature as a faster
-alternative to cuDNN, it is not faster at kernel size 3 in any shape-generic
-form, and the released hand-tuned kernel's advantage on its 3x3 benchmark
+alternative to cuDNN, it loses at kernel size 3 in shape-generic form in all
+12 grid shapes and 7 of 8 held-out shapes on the RTX 3090 (the eighth at
+1.009), and the released hand-tuned kernel's advantage on its 3x3 benchmark
 layer holds on one RTX 3090 host and not on another.
 On the authors' own 3x3 benchmark layer, one RTX 3090 host gave the released
 kernel 1.56x cuDNN in dedicated timing runs (37.0 against 23.8 TFLOPS) and
