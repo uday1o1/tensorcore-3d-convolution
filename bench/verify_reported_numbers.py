@@ -109,8 +109,8 @@ CLAIMED = {
     "conv9, cuDNN events best max": "41.4",
     "conv9, Im2win kernel best min, same host": "36.3",
     "conv9, Im2win kernel best max, same host": "36.9",
-    "conv9, Im2win over cuDNN low, same host": "0.88",
-    "conv9, Im2win over cuDNN high, same host": "0.90",
+    "conv9, Im2win over cuDNN low, same round": "0.88",
+    "conv9, Im2win over cuDNN high, same round": "0.89",
     # Early-placement controls and the training patch size
     "controls, 5-5-3-3 step cost": "1.80",
     "controls, 7-5-5-3 step cost": "2.91",
@@ -327,8 +327,14 @@ def main():
         cu = [float(x) for x in re.findall(r"events best\s+([\d.]+)", log)]
         computed["conv9, Im2win kernel best min, same host"] = min(im)
         computed["conv9, Im2win kernel best max, same host"] = max(im)
-        computed["conv9, Im2win over cuDNN low, same host"] = min(im) / max(cu)
-        computed["conv9, Im2win over cuDNN high, same host"] = max(im) / min(cu)
+        # Each round times the Im2win kernel, then cuDNN in two fresh
+        # processes; the ratio is taken within a round.
+        ratios = []
+        for block in re.split(r"== round \d+ im2win", log)[1:]:
+            k = float(re.search(r"TFLOPS_best ([\d.]+)", block).group(1))
+            ratios += [k / float(c) for c in re.findall(r"events best\s+([\d.]+)", block)]
+        computed["conv9, Im2win over cuDNN low, same round"] = min(ratios)
+        computed["conv9, Im2win over cuDNN high, same round"] = max(ratios)
     else:
         for k in list(CLAIMED):
             if k.startswith("conv9,"):
