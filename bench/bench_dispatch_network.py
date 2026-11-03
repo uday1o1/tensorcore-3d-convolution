@@ -2,14 +2,14 @@
 
 bench_end_to_end.py measures what the windowed paradigm costs if you adopt it
 everywhere, on a standard kernel size 3 nnU-Net. The crossover map says that
-is the wrong way to adopt it: at kernel size 3 the windowed path loses in
-every shape measured.
+is the wrong way to adopt it: at kernel size 3 the windowed path loses on the
+median in all 12 crossover-grid shapes on both GPUs.
 
 This benchmark asks the question the map actually poses. A dispatcher has to
 clear two bars to be worth anything:
 
   1. do no harm. On a kernel size 3 network, where the windowed path loses in
-     every shape measured, the dispatcher must match cuDNN. If it regresses
+     all 12 grid shapes, the dispatcher must match cuDNN. If it regresses
      here it is unusable, because small kernels are the common case.
   2. win where the map says it should. On a large kernel network, the
      dispatcher must beat cuDNN.

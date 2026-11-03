@@ -10,6 +10,7 @@
 # TensorConv/im2win, so that ../src/common and ../src/tensorCore resolve:
 #
 #   git clone https://github.com/TensorConv/im2win.git
+#   git -C im2win checkout 79e7c605a5f628ac0a87c02490e0c8b1da2fd168
 #   mkdir im2win/sweepbuild
 #   cp bench/CMakeLists.txt bench/sweep_convs.cpp im2win/sweepbuild/
 #   cd im2win/sweepbuild

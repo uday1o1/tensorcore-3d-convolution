@@ -93,8 +93,9 @@ def timed_pair(ref, win, timeit, trial):
     """Time both paths, alternating which goes first on successive trials.
 
     Timing the baseline first on every trial would put any position effect on
-    one side of every ratio. Alternating the order cancels a position effect in the median and, because
-    the order is recorded, also lets it be measured instead of assumed absent.
+    one side of every ratio. Alternating the order spreads it over both paths,
+    and only an even trial count balances it exactly; because the order is
+    recorded, the effect is also measured rather than assumed absent.
 
     Returns (t_ref, t_win, ref_first).
     """
@@ -112,8 +113,8 @@ def order_summary(pairs):
     """Median ratio for each order and their quotient, the position effect.
 
     pairs is a list of (t_ref, t_win, ref_first). A quotient near 1 means order
-    did not matter; far from 1 means it did, and the order-balanced median is
-    the number to report.
+    did not matter; far from 1 means it did, and the two per-order ratios
+    should be read alongside the pooled median.
     """
     import statistics as st
     a = [r / w for r, w, f in pairs if f]

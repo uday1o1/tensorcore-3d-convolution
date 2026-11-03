@@ -158,7 +158,8 @@ def resolve(args):
         for m in missing:
             print(f"  - {m}")
         print("\nThe timing benchmarks in bench/ run on synthetic tensors and the "
-              "analysis scripts read committed files in results/. See the README "
+              "analysis scripts other than analyze_variance_pilot.py read committed "
+              "files in results/. See the README "
               "for which results need what.")
         return None
     return pre, ck, splits

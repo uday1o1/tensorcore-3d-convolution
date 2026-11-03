@@ -1,4 +1,4 @@
-# Core dependencies. The Python benchmarks in bench/ that do not build MedNeXt
+# Python 3.12. Core dependencies. The Python benchmarks in bench/ that do not build MedNeXt
 # or nnU-Net networks run with just these plus a CUDA GPU. bench/sweep_convs.cpp
 # also needs a clone of the Im2win sources (see bench/CMakeLists.txt).
 #

@@ -40,5 +40,7 @@ class nnUNetTrainerV2_MedNeXt_B_k3_150ep_s2(nnUNetTrainerV2_MedNeXt_B_kernel3):
         torch.manual_seed(SEED)
         if torch.cuda.is_available():
             torch.cuda.manual_seed_all(SEED)
-        self.print_to_log_file(f"variance pilot: seeded with {SEED} "
-                               f"(nnU-Net seeds 12345 only with --deterministic)")
+        # The wording matches the committed training logs; nnU-Net itself
+        # seeds 12345 only when run with --deterministic.
+        self.print_to_log_file(f"variance pilot: reseeded to {SEED} "
+                               f"(nnU-Net default is 12345)")

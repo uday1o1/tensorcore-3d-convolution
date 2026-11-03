@@ -99,7 +99,9 @@ def receptive_field(model, kernels, strides=(2, 2, 2, 1)):
 
     The effective receptive field is far smaller and roughly Gaussian;
     measuring it means backpropagating from a centre voxel and reading the
-    extent of nonzero input gradient (bench/bench_effective_receptive_field.py).
+    spatial extent of the input gradient, both its full nonzero support and the
+    width holding a fixed fraction of its magnitude
+    (bench/bench_effective_receptive_field.py).
 
     Returns (receptive field, counts per level).
     """

@@ -43,6 +43,10 @@ Reports per configuration: parameters, FLOPs, measured latency, measured peak
 training memory, and the theoretical receptive field in voxels.
 
 Usage:  python bench_receptive_field.py
+
+The committed results/receptive_field_cost.json keeps the cost fields and the
+GPU name only; the receptive field values the write-up quotes come from
+results/effective_receptive_field.json.
 """
 import json
 import sys

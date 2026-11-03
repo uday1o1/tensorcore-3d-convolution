@@ -12,7 +12,7 @@ means against an oracle, and rule agreement rates. A reader has no way to check
 those by eye, and a transcription error between the data and the prose would be
 invisible.
 
-This script recomputes each of them from the committed JSON and prints them
+This script recomputes the derived numbers listed in CLAIMED from the committed JSON and prints them
 next to the value the write-up states, so any drift shows up as MISMATCH. It
 needs no GPU and no dataset: it reads results/ and nothing else.
 
@@ -30,16 +30,6 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 
 # What the write-up claims. Update these together with the prose, never alone.
-#
-COUNTS = {
-    "audit, 3090 session winner changes", "audit, 4090 session winner changes",
-    "audit, cross-host winner changes, one session",
-    "audit, cross-host winner changes, session-confirmed",
-    "audit, 3090 rule 2 confirmed by both sessions",
-    "dense configurations won", "depthwise configurations won",
-    "wins at k>=9", "wins at C>=240 and k>=5",
-    "held out, rule agreements out of 32",
-}
 CLAIMED = {
     "dense configurations won": 26,
     "depthwise configurations won": 2,
@@ -117,7 +107,6 @@ CLAIMED = {
 # a string with the decimals the prose prints, and must equal the computed
 # value rounded to those decimals: a relative tolerance would pass a value the
 # prose misrounds.
-COUNTS.update(k for k, v in CLAIMED.items() if isinstance(v, int))
 
 
 def decimals(claim):
@@ -219,20 +208,12 @@ def main():
         print("note: receptive_field_cost absent, skipping placement claims\n")
 
     if pilot:
-        # Two formats are read: the two-run output, with one spread and one p
-        # per class, and the N-run output, which reports every pairwise
-        # comparison.
         for c in pilot.get("classes", {}).values():
             name = c["name"]
-            if "pairs" in c:
-                computed[f"pilot, {name} spread"] = c["worst_spread"]
-                ps = [r["p"] for r in c["pairs"] if r.get("p") is not None]
-                if ps:
-                    computed[f"pilot, {name} paired p"] = min(ps)
-            else:
-                computed[f"pilot, {name} spread"] = c["spread"]
-                if c.get("paired_p") is not None:
-                    computed[f"pilot, {name} paired p"] = c["paired_p"]
+            computed[f"pilot, {name} spread"] = c["worst_spread"]
+            ps = [r["p"] for r in c["pairs"] if r.get("p") is not None]
+            if ps:
+                computed[f"pilot, {name} paired p"] = min(ps)
     else:
         for k in list(CLAIMED):
             if k.startswith("pilot,"):

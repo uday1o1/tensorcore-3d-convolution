@@ -4,9 +4,9 @@ The crossover grid, held-out test and training sweep are measured on an RTX
 3090 and repeated on an RTX 4090. The 3090 is the right device for the
 reproduction, since it is the GPU class Im2win's own evaluation used, but
 results from one device are a property of that machine. The
-decision rule in src/dispatch.py is the clearest case: its thresholds encode
-that device's Tensor Core geometry, its memory bandwidth, and the particular
-set of algorithms cuDNN ships for sm_86.
+decision rule in src/dispatch.py is the clearest case: its thresholds were read
+off the RTX 3090 grid alone, so they carry whatever that device and the cuDNN
+build for sm_86 favoured.
 
 This script compares device-tagged result files against each other. It does not
 measure anything; run the sweeps on each device first. It reads results/ in the
@@ -134,7 +134,7 @@ def same_gpu_two_hosts(agree):
     common as the changes between the 3090 and 4090 hosts, the host explains
     the cross-device result as well as the GPU does.
 
-    Every count uses only cells whose sessions agree on each host, the same
+    Every winner-change count uses only cells whose sessions agree on each host, the same
     filter the cross-device count uses. Returns None when the files are absent.
     """
     d = RESULTS / "host2"

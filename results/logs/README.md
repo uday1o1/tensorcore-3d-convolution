@@ -1,6 +1,6 @@
 # Raw run logs
 
-Verbatim stdout from the runs that produced the reported numbers, kept because
+Verbatim console output (stdout and stderr) from the runs that produced the reported numbers, kept because
 a log is the authentic record of what was executed and when. The Part I
 measurements made with short inline scripts (the Im2win reproduction, the
 generality audit, correctness, dimensional scaling, FFT, profiling and the
@@ -28,13 +28,16 @@ comparison times both algorithms directly.
 
 ## Training
 
-Training logs as nnU-Net writes them (per-epoch losses, online Dice estimate,
-epoch time). The scores reported for each run are the per-case summaries in
-`../validation/`, not the online estimate here.
+The `train_*.log` files are nnU-Net's own training logs
+(`fold_0/training_log_*.txt` in each run directory), renamed; `pilot_s1.log`
+and `pilot_s2.log` are the console output of the two pilot runs. Both carry
+per-epoch losses, the online Dice estimate and epoch time. The scores reported for each run are the per-case summaries in
+`../validation/` (for the two pilot runs, `../variance_pilot.json`), not the
+online estimate here.
 
 | Log | Run | Training host |
 |---|---|---|
-| `pilot_s1.log`, `pilot_s2.log` | MedNeXt-B kernel 3, seeds 1 and 2, the seed-spread pair behind `../variance_pilot.json` | the RTX 3090 benchmark host |
+| `pilot_s1.log`, `pilot_s2.log` | MedNeXt-B kernel 3, seeds 1 and 2, the seed-spread pair behind `../variance_pilot.json` | not recorded in the logs |
 | `train_k3_s1.log` | MedNeXt-B kernel 3, the baseline and UpKern source | RTX 3090, `../validation/training_host_rtx3090.txt` |
 | `train_place_3_5_5_7.log` | 3-5-5-7, UpKern from the kernel 3 run | RTX 3090, `../validation/training_host_rtx3090.txt` |
 | `train_place_3_3_5_5.log` | 3-3-5-5, UpKern from the kernel 3 run | RTX 4090, `../validation/training_host_rtx4090.txt` |
@@ -53,7 +56,7 @@ PyTorch 2.11.0+cu128 (CUDA 12.8) with cuDNN 9.19.0 on every host, so that
 cross-device differences are not library version; they remain host as well as
 GPU differences.
 
-- RTX 3090 benchmark host: sm_86, driver 595.71.05
+- RTX 3090 benchmark host: driver 595.71.05
   (`measurements/host_rtx3090_main_versions.log`).
 - RTX 4090 benchmark host: sm_89, 128 SMs; versions recorded in each row of the
   `rtx4090` JSON files.

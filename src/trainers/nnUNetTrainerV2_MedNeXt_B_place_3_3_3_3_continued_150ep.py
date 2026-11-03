@@ -2,9 +2,9 @@
 
 The control for UpKern. An UpKern placement starts from the trained kernel 3
 network with a fresh optimizer and learning rate schedule, so it is trained
-for 300 epochs in total against the baseline's 150. 3-3-5-5 and 3-5-5-7 with
-UpKern both beat the baseline by about 0.001 liver Dice while 3-5-5-7 from
-scratch did not, which is equally consistent with larger kernels helping and
+for 300 epochs in total against the baseline's 150. Every UpKern placement
+beats the baseline by about 0.001 liver Dice while 3-5-5-7 from scratch gains
+0.0002, which is equally consistent with larger kernels helping and
 with the extra training helping. This run applies the same protocol with no
 kernel enlarged. A placement's gain counts towards receptive field only to the
 extent it exceeds this run's. On MSD Liver fold 0 this run gains 0.0008 liver

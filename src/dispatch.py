@@ -11,15 +11,21 @@ module implements two policies:
   rule      decide from shape alone, at zero runtime cost
   autotune  time both once per distinct shape and cache the winner
 
-The autotuner is the upper bound the rule is measured against. It is exact by
-construction but pays a probing cost on first sight of each shape, and it can
-only choose well for shapes it actually encounters.
+The autotuner chooses each shape's faster path from its own timings, so it is
+the measured reference the rule is compared with on whole networks. Its choice
+is only as good as one timing of each path, it pays a probing cost on first
+sight of each shape, and it can only choose for shapes it actually encounters.
+Its probe can pick the slower path: on whole networks at kernel sizes 3 and 5
+it lands below the rule (0.939x and 0.908x of cuDNN against 0.986x and 0.994x,
+results/logs/netdispatch.log).
 
 The rule is deliberately three threshold clauses, not a fitted surface. A
 closed form is not justified here: the ratio is a quotient of two
 shape-dependent efficiencies, and cuDNN's own efficiency varies with shape, so
 a formula fitted to the windowed side alone would be overfitted to one GPU.
-Clause 1 held in every configuration measured on both GPUs; clauses 2 and 3 are
+Clause 1 held in all 12 grid shapes on both GPUs and in 7 of 8 held-out shapes
+on the RTX 3090 (results/dispatch_heldout_rtx3090.json, the eighth at 1.009)
+and all 8 on the RTX 4090; clauses 2 and 3 are
 thresholds read off the RTX 3090 grid and do not transfer unchanged to the
 RTX 4090 (results/crossover_map_rtx4090.json), where clause 2 holds in 8 of 12
 shapes and clause 3 in 14 of 24.
@@ -140,9 +146,9 @@ class DispatchingConv3d(nn.Module):
         Timed under no_grad on a detached input, so autotuning never perturbs
         the forward pass it is called from.
 
-        This is deliberately not a quick probe. It is the upper bound the rule
-        is measured against, so if it is noisy the whole comparison is
-        meaningless. Two specific hazards are handled:
+        This is deliberately not a quick probe: the rule is compared against
+        it, so a noisy probe would make that comparison meaningless. Two
+        specific hazards are handled:
 
         - cuDNN's own algorithm autotuner (cudnn.benchmark) needs several
           calls before it settles on an algorithm. Timing inside that window

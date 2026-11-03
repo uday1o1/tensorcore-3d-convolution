@@ -13,7 +13,7 @@ Three comparison families:
 
 A difference is only read as one if it exceeds the seed spread measured by the
 variance pilot (results/variance_pilot.json) for that class. The pilot showed
-that a paired signed-rank test across cases calls two identical networks
+that a paired signed-rank test across cases calls two identically configured networks
 different, so the p value is reported but never decides anything on its own.
 
 Which cases count. A class is scored only on cases whose reference contains

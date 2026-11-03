@@ -29,7 +29,7 @@ against a known null, it should not find anything.
 
 Usage:
   python analyze_variance_pilot.py <summary1.json> <summary2.json> [more...]
-  python analyze_variance_pilot.py          # all pilot seeds present on disk
+  python analyze_variance_pilot.py          # seeds 1-5 found under $RESULTS_FOLDER
 """
 import itertools
 import json
@@ -146,11 +146,13 @@ def main(argv):
         return 1
 
     runs = [per_case(p) for p in paths]
-    labels = []
-    for i, p in enumerate(paths):
-        parent = p.parts[-4]
-        labels.append(parent.split("_s")[-1].split("__")[0] if "_s" in parent
-                      else str(i + 1))
+    # A run is named by its nnU-Net run directory (.../<run>/fold_0/
+    # validation_raw/summary.json) or, for a copied summary, by its file name
+    # (<Trainer>_summary.json, as scripts/setup_vast.sh writes it).
+    names = [p.resolve().parts[-4] if p.name == "summary.json"
+             else p.stem.removesuffix("_summary") for p in paths]
+    labels = [n.split("__")[0].rsplit("_s", 1)[-1] if "_s" in n else str(i + 1)
+              for i, n in enumerate(names)]
     classes = sorted({c for r in runs for v in r.values() for c in v} - {"0"})
     pairs = list(itertools.combinations(range(len(runs)), 2))
 
@@ -213,7 +215,7 @@ def main(argv):
     print(f"  across all classes, {total_sig} of {total_cmp} paired tests between "
           f"identical configurations reached p < {ALPHA}")
 
-    json.dump({"summaries": [p.parts[-4] for p in paths], "n_runs": len(runs),
+    json.dump({"summaries": names, "n_runs": len(runs),
                "classes": report, "worst_spread": worst_overall,
                "target_effect": TARGET_EFFECT, "verdict": verdict,
                "n_significant": total_sig, "n_comparisons": total_cmp},
