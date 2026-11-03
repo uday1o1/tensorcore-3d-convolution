@@ -7,7 +7,9 @@ UpKern both beat the baseline by about 0.001 liver Dice while 3-5-5-7 from
 scratch did not, which is equally consistent with larger kernels helping and
 with the extra training helping. This run applies the same protocol with no
 kernel enlarged. A placement's gain counts towards receptive field only to the
-extent it exceeds this run's.
+extent it exceeds this run's. On MSD Liver fold 0 this run gains 0.0008 liver
+Dice over the baseline, and the UpKern placements exceed it by 0.00025 to
+0.00033, inside the 0.0005 seed spread (results/training_study.json).
 """
 import sys
 from pathlib import Path

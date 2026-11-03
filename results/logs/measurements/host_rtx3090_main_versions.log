@@ -1,0 +1,21 @@
+# command
+ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=30 <host> 'nvidia-smi --query-gpu=name,driver_version,memory.total,utilization.gpu --format=csv,noheader
+echo "--- torch ---"
+source /venv/main/bin/activate 2>/dev/null || true
+python -c "import torch;print(torch.__version__, torch.version.cuda, torch.cuda.is_available(), torch.backends.cudnn.version())" 2>&1 | tail -2
+echo "--- disk ---"; df -h / | tail -1
+echo "--- im2win sweep harness built? ---"; ls -la /workspace/im2win/sweepbuild/sweep 2>/dev/null
+echo "--- mednext installed? ---"; python -c "import nnunet_mednext; print(\"yes\", nnunet_mednext.__file__)" 2>&1 | tail -1' 2>&1 | tail -14
+# date
+2026-09-19 21:06:49 UTC
+# output
+NVIDIA GeForce RTX 3090, 595.71.05, 24576 MiB, 0 %
+--- torch ---
+Activated conda/uv virtual environment at /venv/main
+2.11.0+cu128 12.8 True 91900
+--- disk ---
+overlay         102G   44G   59G  43% /
+--- im2win sweep harness built? ---
+-rwxrwxr-x 1 root root 85576 Sep 19 07:57 /workspace/im2win/sweepbuild/sweep
+--- mednext installed? ---
+yes /workspace/MedNeXt/nnunet_mednext/__init__.py

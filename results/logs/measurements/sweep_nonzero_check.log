@@ -1,0 +1,41 @@
+# command
+ssh -o StrictHostKeyChecking=no -o ConnectTimeout=30 <host> "
+cd /workspace/im2win/sweepbuild
+python3 - << 'PYEOF'
+import re
+p='sweep_convs.cpp'
+s=open(p).read()
+# add output-nonzero + checksum verification after the timing loop
+s = s.replace(
+'    cout << \"TFLOPS \" << maxg/1000.0 << \" GFLOP \" << operations/1e9 << endl;',
+'''    // verify the kernel actually produced output
+    half *op = output_d.getDataPtr();
+    size_t nz = 0; double checksum = 0.0;
+    size_t total = output_d.batch*output_d.channel*output_d.height*output_d.width;
+    for (size_t i = 0; i < total; ++i) {
+        float v = __half2float(op[i]);
+        if (v != 0.0f) nz++;
+        checksum += (double)v;
+    }
+    cout << \"TFLOPS \" << maxg/1000.0 << \" GFLOP \" << operations/1e9
+         << \" nonzero \" << nz << \"/\" << total
+         << \" checksum \" << checksum << endl;''')
+open(p,'w').write(s)
+print('patched')
+PYEOF
+export CUDA_SOURCE_NAME='im2win_async_128x64_4_base_conv9.cu'
+export CUDA_PATH=/usr/local/cuda
+ninja 2>&1 | grep -E '^FAILED|error' | head -5
+echo '=== conv9 (known good) ==='
+./sweep 256 64 56 56 64 3 1 2>&1 | tail -1
+echo '=== nnU-Net 2D shape ==='
+./sweep 16 30 512 512 30 3 1 2>&1 | tail -1
+" 2>&1 | tail -8
+# date
+2026-09-19 07:01:18 UTC
+# output
+patched
+=== conv9 (known good) ===
+TFLOPS 37.0125 GFLOP 55.0377 nonzero 47775744/47775744 checksum 6.89506e+09
+=== nnU-Net 2D shape ===
+TFLOPS 16854.5 GFLOP 67.4179 nonzero 0/124848000 checksum 0

@@ -1,0 +1,55 @@
+# command
+ssh -o StrictHostKeyChecking=no -o ConnectTimeout=30 <host> "
+cd /workspace/win3d && source /venv/main/bin/activate
+python3 << 'PYEOF'
+import torch, torch.nn.functional as F, time
+from winconv import im2win_conv2d
+torch.backends.cudnn.benchmark=True
+
+def t(fn,n=30):
+    for _ in range(10): fn()
+    torch.cuda.synchronize(); t0=time.time()
+    for _ in range(n): fn()
+    torch.cuda.synchronize(); return (time.time()-t0)/n
+
+# ANCHOR: conv9, where the hand-tuned kernel achieves 37.1 TFLOPS
+B,C,H,W,Co,k,s = 256,64,56,56,64,3,1
+x=torch.randn(B,C,H,W,device='cuda',dtype=torch.half)
+w=torch.randn(Co,C,k,k,device='cuda',dtype=torch.half)
+oh=(H-k)//s+1
+ops=2*B*Co*oh*oh*C*k*k
+
+t_cudnn = t(lambda: F.conv2d(x,w,stride=s))
+t_win   = t(lambda: im2win_conv2d(x,w,stride=s))
+# decompose: transform only
+def xform():
+    u=x.unfold(2,k,s).permute(0,2,1,4,3).contiguous()
+    return u.reshape(B*oh,C*k,W)
+t_xf = t(xform)
+
+print('ANCHOR: conv9 (256,64,56,56)x(64,3,3), fp16')
+print(f'  cuDNN conv2d          : {t_cudnn*1000:7.3f} ms -> {ops/t_cudnn/1e12:6.2f} TFLOPS')
+print(f'  generic windowed TOTAL: {t_win*1000:7.3f} ms -> {ops/t_win/1e12:6.2f} TFLOPS')
+print(f'    of which transform  : {t_xf*1000:7.3f} ms ({t_xf/t_win*100:.0f}% of total)')
+print(f'    of which conv1d     : {(t_win-t_xf)*1000:7.3f} ms')
+print(f'  ratio (cuDNN/windowed): {t_cudnn/t_win:5.2f}x')
+print()
+print(f'  hand-tuned im2win kernel alone was 37.1 TFLOPS (1.484 ms)')
+print(f'  generic windowed compute alone: {ops/(t_win-t_xf)/1e12:.2f} TFLOPS')
+print(f'  -> hand-tuning advantage over generic: {37.1/(ops/(t_win-t_xf)/1e12):.2f}x')
+PYEOF
+" 2>&1 | tail -14
+# date
+2026-09-19 07:55:36 UTC
+# output
+Activated conda/uv virtual environment at /venv/main
+ANCHOR: conv9 (256,64,56,56)x(64,3,3), fp16
+  cuDNN conv2d          :   1.297 ms ->  42.44 TFLOPS
+  generic windowed TOTAL:   5.730 ms ->   9.61 TFLOPS
+    of which transform  :   1.452 ms (25% of total)
+    of which conv1d     :   4.277 ms
+  ratio (cuDNN/windowed):  0.23x
+
+  hand-tuned im2win kernel alone was 37.1 TFLOPS (1.484 ms)
+  generic windowed compute alone: 12.87 TFLOPS
+  -> hand-tuning advantage over generic: 2.88x

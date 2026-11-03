@@ -1,0 +1,41 @@
+# command
+ssh -o StrictHostKeyChecking=no -o ConnectTimeout=30 <host> "
+source /venv/main/bin/activate
+python3 << 'PYEOF'
+import torch, torch.nn.functional as F, time
+torch.backends.cudnn.benchmark = True
+
+x = torch.randn(256,64,56,56, device='cuda', dtype=torch.half)
+w = torch.randn(64,64,3,3, device='cuda', dtype=torch.half)
+out_h=54
+ops = 256*64*out_h*out_h*64*3*3*2
+
+for _ in range(30): F.conv2d(x,w,stride=1,padding=0)
+torch.cuda.synchronize()
+
+# per-run timings with cuda events, matching their best-of-N reporting
+times=[]
+for _ in range(50):
+    s=torch.cuda.Event(enable_timing=True); e=torch.cuda.Event(enable_timing=True)
+    s.record()
+    F.conv2d(x,w,stride=1,padding=0)
+    e.record(); torch.cuda.synchronize()
+    times.append(s.elapsed_time(e)/1000.0)
+
+best=min(times); mean=sum(times)/len(times)
+print(f'cuDNN best-of-50 : {best*1000:.3f} ms -> {ops/best/1e12:.1f} TFLOPS')
+print(f'cuDNN mean-of-50 : {mean*1000:.3f} ms -> {ops/mean/1e12:.1f} TFLOPS')
+print()
+print(f'Im2win (best-of-50, kernel only, transform excluded): 37.1 TFLOPS')
+print(f'LIKE-FOR-LIKE ratio vs cuDNN best-of-50: {37.1/(ops/best/1e12):.2f}x')
+PYEOF
+" 2>&1 | tail -10
+# date
+2026-09-19 05:21:58 UTC
+# output
+Activated conda/uv virtual environment at /venv/main
+cuDNN best-of-50 : 2.314 ms -> 23.8 TFLOPS
+cuDNN mean-of-50 : 2.368 ms -> 23.2 TFLOPS
+
+Im2win (best-of-50, kernel only, transform excluded): 37.1 TFLOPS
+LIKE-FOR-LIKE ratio vs cuDNN best-of-50: 1.56x

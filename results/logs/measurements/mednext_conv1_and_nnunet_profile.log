@@ -1,0 +1,78 @@
+# command
+ssh -o StrictHostKeyChecking=no -o ConnectTimeout=30 <host> "
+source /venv/main/bin/activate
+python3 << 'PYEOF'
+import torch, torch.nn as nn, time
+from torch.profiler import profile, ProfilerActivity
+from fvcore.nn import FlopCountAnalysis
+from nnunet_mednext.network_architecture.generic_UNet import Generic_UNet
+from nnunet_mednext.network_architecture.mednextv1.create_mednext_v1 import create_mednext_v1
+
+# --- MedNeXt conv1 share, with CORRECT num_classes=3 ---
+mm = create_mednext_v1(num_input_channels=1, num_classes=3, model_id='B', kernel_size=3).cuda()
+x = torch.zeros(1,1,128,128,128, device='cuda')
+f = FlopCountAnalysis(mm, x); f.unsupported_ops_warnings(False)
+tot = f.total()
+c1 = sum(v for k,v in f.by_module().items() if k.endswith('.conv1'))
+print(f'MedNeXt (num_classes=3): total {tot/1e9:.1f}G, conv1 {c1/tot*100:.1f}%  [previously reported 6.2%]')
+del mm; torch.cuda.empty_cache()
+
+# --- nnU-Net base=30 timing/profile ---
+m = Generic_UNet(1,30,3,5,2,2, nn.Conv3d, nn.InstanceNorm3d, {'eps':1e-5,'affine':True},
+    nn.Dropout3d, {'p':0,'inplace':True}, nn.LeakyReLU, {'negative_slope':1e-2,'inplace':True},
+    False, False, lambda x:x, None, [[2,2,2]]*5, [[3,3,3]]*6, False, True, True).cuda()
+opt = torch.optim.SGD(m.parameters(), lr=1e-2, momentum=0.99)
+lf = nn.CrossEntropyLoss()
+xt = torch.randn(2,1,128,128,128, device='cuda'); yt = torch.randint(0,3,(2,128,128,128), device='cuda')
+def step(amp):
+    if amp:
+        with torch.autocast('cuda', dtype=torch.float16):
+            o=m(xt); l=lf(o,yt)
+    else:
+        o=m(xt); l=lf(o,yt)
+    l.backward(); opt.step(); opt.zero_grad(set_to_none=True)
+for amp in [False,True]:
+    for _ in range(3): step(amp)
+    torch.cuda.synchronize(); t0=time.time()
+    for _ in range(8): step(amp)
+    torch.cuda.synchronize(); dt=(time.time()-t0)/8
+    print(f'base=30 train AMP={amp}: {dt*1000:.0f} ms/iter, peak {torch.cuda.max_memory_allocated()/1e9:.2f} GB')
+    torch.cuda.reset_peak_memory_stats(); torch.cuda.empty_cache()
+
+# inference profile
+m.eval(); xi = torch.randn(1,1,128,128,128, device='cuda')
+def inf():
+    with torch.no_grad(), torch.autocast('cuda', dtype=torch.float16): m(xi)
+for _ in range(5): inf()
+torch.cuda.synchronize(); t0=time.time()
+for _ in range(20): inf()
+torch.cuda.synchronize(); print(f'base=30 inference: {(time.time()-t0)/20*1000:.1f} ms/patch')
+with profile(activities=[ProfilerActivity.CUDA]) as pr:
+    for _ in range(10): inf()
+    torch.cuda.synchronize()
+ev=[e for e in pr.key_averages() if e.self_device_time_total>0]
+T=sum(e.self_device_time_total for e in ev)
+cat={'CONV':0,'LAYOUT':0,'NORM':0,'OTHER':0}
+for e in ev:
+    k=e.key
+    c='CONV' if ('xmma' in k or 'convNd' in k or 'implicit_gemm' in k) else \
+      'LAYOUT' if ('ToNhwc' in k or 'ToNchw' in k or 'Memcpy' in k or 'Memset' in k) else \
+      'NORM' if ('bn_fw' in k or 'bn_bw' in k) else 'OTHER'
+    cat[c]+=e.self_device_time_total
+for c,v in sorted(cat.items(), key=lambda kv:-kv[1]): print(f'  {v/T*100:5.1f}%  {c}')
+PYEOF
+" 2>&1 | tail -12
+# date
+2026-09-19 07:10:41 UTC
+# output
+Activated conda/uv virtual environment at /venv/main
+MedNeXt (num_classes=3): total 169.4G, conv1 6.2%  [previously reported 6.2%]
+base=30 train AMP=False: 733 ms/iter, peak 17.10 GB
+base=30 train AMP=True: 338 ms/iter, peak 4.79 GB
+base=30 inference: 59.2 ms/patch
+/venv/main/lib/python3.12/site-packages/torch/profiler/profiler.py:224: UserWarning: Warning: Profiler clears events at the end of each cycle.Only events from the current cycle will be reported.To keep events across cycles, set acc_events=True.
+  _warn_once(
+   65.6%  CONV
+   13.6%  NORM
+   12.2%  LAYOUT
+    8.6%  OTHER

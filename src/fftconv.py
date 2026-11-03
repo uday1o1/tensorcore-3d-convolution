@@ -2,8 +2,9 @@ import torch, torch.nn.functional as F
 
 def fft_conv3d(x, w, stride=1):
     '''FFT-based 3D convolution, valid padding, stride 1 only.
-    Cost is O(n log n) in the volume and INDEPENDENT of kernel size,
-    which is the property that should make it win at large k.'''
+    Cost is O(n log n) in the padded volume (n + k - 1 per axis) and depends
+    on kernel size only through that padding, which is the property that
+    should make it win at large k.'''
     assert stride == 1, 'FFT path implemented for stride 1'
     B, C, D, H, W = x.shape
     Co, _, kd, kh, kw = w.shape

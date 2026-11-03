@@ -4,8 +4,8 @@ Replicates im2win_conv3d_depthwise's transform in numpy and compares against a
 naive depthwise conv3d. The risk being tested is the channel grouping: the
 unfold must order the materialized axis as (c, kd) so that a grouped conv2d
 with groups=C, which consumes input channels [c*k, (c+1)*k), picks out exactly
-channel c's kd slices. Getting (kd, c) instead is silently wrong, which is how
-the dense path broke earlier in this project.
+channel c's kd slices. Getting (kd, c) instead is silently wrong: the output
+has the right shape and plausible values.
 """
 import numpy as np
 rng = np.random.default_rng(0)

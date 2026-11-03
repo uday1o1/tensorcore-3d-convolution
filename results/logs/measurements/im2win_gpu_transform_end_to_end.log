@@ -1,0 +1,59 @@
+# command
+ssh -o StrictHostKeyChecking=no -o ConnectTimeout=20 <host> "
+source /venv/main/bin/activate
+python3 << 'PYEOF'
+import torch, time
+
+def time_it(fn, n=30):
+    for _ in range(10): fn()
+    torch.cuda.synchronize(); t0=time.time()
+    for _ in range(n): fn()
+    torch.cuda.synchronize(); return (time.time()-t0)/n
+
+# conv9 shape: (256,64,56,56), filter 3x3, stride 1
+B,C,H,W,k,s = 256,64,56,56,3,1
+x = torch.randn(B,C,H,W, device='cuda', dtype=torch.half)
+win_row = (H-k)//s + 1
+
+def im2win_transform():
+    # exactly what image2window does: gather k consecutive rows per window row
+    # (B,C,H,W) -> (B,C,win_row,k,W) -> (B,C,win_row,k*W)
+    u = x.unfold(2, k, s)              # (B,C,win_row,W,k)
+    return u.permute(0,1,2,4,3).reshape(B,C,win_row,k*W).contiguous()
+
+out = im2win_transform()
+dt = time_it(im2win_transform)
+exp = out.numel()/x.numel()
+print(f'windowed shape {tuple(out.shape)}, expansion {exp:.2f}x (formula predicts {(win_row*k)/H:.2f}x)')
+print(f'GPU im2win transform MEASURED: {dt*1000:.3f} ms')
+traffic = (x.numel() + out.numel())*2
+print(f'  implied bandwidth: {traffic/dt/1e9:.0f} GB/s')
+print()
+
+kern_ms = 55.04/37.1      # im2win kernel (measured 37.1 TFLOPS on 55.04 GFLOP)
+cudnn_ms = 2.314          # measured best-of-50
+tot = kern_ms + dt*1000
+print(f'im2win kernel          : {kern_ms:.3f} ms')
+print(f'+ GPU transform (real) : {dt*1000:.3f} ms')
+print(f'= windowed total       : {tot:.3f} ms')
+print(f'cuDNN (fused)          : {cudnn_ms:.3f} ms')
+print()
+print(f'kernel-only ratio : {cudnn_ms/kern_ms:.2f}x')
+print(f'HONEST ratio      : {cudnn_ms/tot:.2f}x   <-- bracket closed with measurement')
+PYEOF
+" 2>&1 | tail -16
+# date
+2026-09-19 06:58:35 UTC
+# output
+Activated conda/uv virtual environment at /venv/main
+windowed shape (256, 64, 54, 168), expansion 2.89x (formula predicts 2.89x)
+GPU im2win transform MEASURED: 0.561 ms
+  implied bandwidth: 713 GB/s
+
+im2win kernel          : 1.484 ms
++ GPU transform (real) : 0.561 ms
+= windowed total       : 2.044 ms
+cuDNN (fused)          : 2.314 ms
+
+kernel-only ratio : 1.56x
+HONEST ratio      : 1.13x   <-- bracket closed with measurement

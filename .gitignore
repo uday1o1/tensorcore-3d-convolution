@@ -1,6 +1,4 @@
-_local_project_working/
-
-# External references
+# Python and OS files
 __pycache__/
 *.pyc
 .DS_Store

@@ -1,8 +1,8 @@
 """Shape-aware dispatch between windowed convolution and cuDNN.
 
 The crossover map (bench/bench_crossover.py) establishes that neither algorithm
-dominates: measured as a geometric mean over the grid, always-cuDNN sits 1.135x
-off a perfect oracle and always-windowed sits 1.164x off. Which one wins is a
+dominates: measured as a geometric mean over the RTX 3090 grid, always-cuDNN
+sits 1.132x off a perfect oracle and always-windowed sits 1.160x off. Which one wins is a
 function of layer shape, and it is predictable.
 
 That makes the practical artifact a dispatcher rather than a replacement. This
@@ -15,12 +15,14 @@ The autotuner is the upper bound the rule is measured against. It is exact by
 construction but pays a probing cost on first sight of each shape, and it can
 only choose well for shapes it actually encounters.
 
-The rule is deliberately two clauses, not a fitted surface. Section 6.5 of the
-manuscript explains why a closed form is not justified here: the ratio is a
-quotient of two shape-dependent efficiencies, and cuDNN's own efficiency varies
-with shape, so a formula fitted to the windowed side alone would be overfitted
-to one GPU. These two clauses are the part of the surface that held in every
-configuration measured.
+The rule is deliberately three threshold clauses, not a fitted surface. A
+closed form is not justified here: the ratio is a quotient of two
+shape-dependent efficiencies, and cuDNN's own efficiency varies with shape, so
+a formula fitted to the windowed side alone would be overfitted to one GPU.
+Clause 1 held in every configuration measured on both GPUs; clauses 2 and 3 are
+thresholds read off the RTX 3090 grid and do not transfer unchanged to the
+RTX 4090 (results/crossover_map_rtx4090.json), where clause 2 holds in 8 of 12
+shapes and clause 3 in 14 of 24.
 """
 import time
 
@@ -38,20 +40,19 @@ def prefer_windowed(channels, spatial, kernel_size):
 
     Clause 1 excludes kernel size 3, where windowed lost in all 12 shapes
     measured. Clause 2 admits wide layers at kernel size 5 and above, where it
-    won in all 12.
+    won in 11 of 12 on the RTX 3090, the twelfth at parity (0.997).
 
     Clause 3 admits large kernels generally and is the weak one: it holds in
-    18 of 24, not unanimously. The six exceptions are not scattered. Five sit
-    at low channel count (30) or at the single stubborn 120-channel, 32-cubed
-    family, always with spatial extent 32 or above, and every one of the four
-    shapes at spatial extent 16 wins. So the failure mode is narrow layers at
-    large spatial extent, which is the same low-intensity corner the rest of
-    the paper identifies.
+    19 of the 24 shapes at kernel size 9 and above, not unanimously. The five
+    exceptions are not scattered: three at low channel count (30) and two in
+    the single stubborn 120-channel, 32-cubed family, all at spatial extent 32
+    or above, while all eight shapes at spatial extent 16 win. So the failure
+    mode is narrow layers at large spatial extent, the low arithmetic-intensity
+    corner of the grid.
 
-    We deliberately do NOT add a third clause to capture that. A guard on
-    output shrinkage was tried and improved nothing at any threshold, and
-    fitting another parameter to six data points would be overfitting to this
-    grid rather than learning the surface. Clause 3 is the one to drop first
+    We deliberately do NOT add a further clause to capture that: fitting
+    another parameter to five data points would be overfitting to this grid
+    rather than learning the surface. Clause 3 is the one to drop first
     when porting to different hardware, and bench_dispatch.py tests whether it
     survives on shapes it was never derived from.
     """
@@ -85,8 +86,8 @@ class DispatchingConv3d(nn.Module):
                  padding=0, dilation=1, groups=1, bias=True, policy="rule"):
         super().__init__()
         # nn.Conv3d normalizes these to tuples; the windowed path wants scalars.
-        # Comparing a tuple to an int is silently False, which disabled the
-        # windowed path on every layer once already in this project.
+        # Comparing a tuple to an int is silently False, which would disable the
+        # windowed path on every layer.
         kernel_size = kernel_size[0] if isinstance(kernel_size, (tuple, list)) else kernel_size
         stride = stride[0] if isinstance(stride, (tuple, list)) else stride
         padding = padding[0] if isinstance(padding, (tuple, list)) else padding
@@ -103,7 +104,7 @@ class DispatchingConv3d(nn.Module):
         self.policy = policy
 
         self.depthwise = groups > 1 and groups == in_channels == out_channels
-        # shapes the windowed path cannot serve at all
+        # whether the windowed path can serve this layer at all
         self.eligible = (dilation == 1 and kernel_size > 1
                          and (groups == 1 or self.depthwise))
 
@@ -150,8 +151,7 @@ class DispatchingConv3d(nn.Module):
           overhead and host jitter dominate a single reading.
 
         So each path gets a real warmup and the MEDIAN of several batches is
-        taken, matching the discipline used throughout this project after
-        single-shot readings produced three wrong headline numbers.
+        taken, the same discipline the benchmarks use.
         """
         xd = x.detach()
         xp = F.pad(xd, (self.padding,) * 6) if self.padding > 0 else xd

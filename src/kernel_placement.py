@@ -1,8 +1,9 @@
-"""Per-stage kernel placement for MedNeXt, and UpKern initialization.
+"""Per-level kernel placement for MedNeXt, and UpKern initialization.
 
-MedNeXt exposes one kernel size for the whole network. The question under study
-is where a large kernel is worth spending, so the depthwise convolutions are
-reassigned per stage after construction.
+MedNeXt exposes one kernel size for the encoder and one for the decoder, not
+one per stage. The question under study is where a large kernel is worth
+spending, so the depthwise convolutions are reassigned per resolution level
+after construction.
 
 Two facts from MedNeXt's own paper shape this module:
 
@@ -12,12 +13,13 @@ Two facts from MedNeXt's own paper shape this module:
      indistinguishable from small kernels. Any placement study that trains from
      scratch therefore risks measuring an optimization failure and reporting it
      as "receptive field does not help".
-  2. The benefit being chased is roughly 0.2 Dice. Comparisons at that scale
-     only mean something once run-to-run spread is known, which is what the
-     variance pilot measures.
+  2. The benefit being chased is roughly 0.2 Dice points (0.002 as a
+     fraction). Comparisons at that scale only mean something once run-to-run
+     spread is known, which is what the variance pilot measures.
 
-This module is shared by the benchmark and the trainers so that the network
-being timed and the network being trained are built by the same code.
+This module is shared by the receptive-field benchmarks and the trainers so
+that the networks benchmarked and the network being trained are built by the
+same code.
 """
 import torch
 import torch.nn as nn
@@ -31,7 +33,7 @@ def depthwise_convs(model):
 
 
 def set_stage_kernels(model, kernels):
-    """Give each encoder stage its own depthwise kernel size.
+    """Give each resolution level its own depthwise kernel size.
 
     A Conv3d's kernel size cannot be reassigned in place because the weight
     tensor shape is fixed, so each is replaced by a new convolution with
@@ -41,6 +43,11 @@ def set_stage_kernels(model, kernels):
     MedNeXt's attribute names are not a public interface. The 1x1x1 expansion
     and compression convolutions are untouched, which keeps this an experiment
     about receptive field rather than about width.
+
+    Every depthwise convolution at a level's width changes together: the
+    encoder blocks, the stride-2 downsampling convolution and the decoder
+    blocks. Widths beyond len(kernels) (the bottleneck) take the last entry.
+    Transposed upsampling convolutions are not nn.Conv3d and keep their kernel.
 
     Returns the number of layers changed. The caller must check it: a silent
     zero means every configuration is the same network, which would produce a
@@ -69,7 +76,7 @@ def set_stage_kernels(model, kernels):
 
 
 def blocks_per_stage(model, n_stages):
-    """How many depthwise convolutions sit in each stage, widest last."""
+    """How many depthwise convolutions sit at each level's width, widest last."""
     per = {}
     for _, m in depthwise_convs(model):
         per.setdefault(m.in_channels, []).append(m.kernel_size[0])
@@ -81,16 +88,20 @@ def blocks_per_stage(model, n_stages):
 
 
 def receptive_field(model, kernels, strides=(2, 2, 2, 1)):
-    """Theoretical receptive field in input voxels along one spatial axis.
+    """Receptive field in input voxels along one spatial axis, summed over the
+    depthwise convolutions at the first len(kernels) resolution levels.
 
-    Block counts come from the model. An earlier version assumed one
-    convolution per stage and understated the result by about half, since
-    MedNeXt-B carries two. The ratios between placements are nearly invariant
-    to that count, so the ordering survived, but the absolute values did not.
+    Block counts come from the model: at each level's width this counts every
+    depthwise convolution, which in MedNeXt-B is two encoder blocks, the
+    stride-2 downsampling convolution and two decoder blocks, five per level.
+    The bottleneck, the transposed upsampling convolutions and the 1x1x1
+    convolutions are not counted.
 
-    This is an upper bound. The effective receptive field is smaller and
-    roughly Gaussian, and measuring it means backpropagating from a centre
-    voxel and reading the extent of nonzero input gradient.
+    The effective receptive field is far smaller and roughly Gaussian;
+    measuring it means backpropagating from a centre voxel and reading the
+    extent of nonzero input gradient (bench/bench_effective_receptive_field.py).
+
+    Returns (receptive field, counts per level).
     """
     counts = blocks_per_stage(model, len(kernels))
     r, jump = 1, 1

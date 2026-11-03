@@ -1,0 +1,37 @@
+# command
+ssh -o StrictHostKeyChecking=no -o ConnectTimeout=25 <host> "
+cd /workspace/win3d && source /venv/main/bin/activate
+python3 << 'PYEOF'
+import json, statistics as st
+rows=json.load(open('/workspace/win3d/dice_results.json'))
+print(f'cases: {len(rows)}')
+import math
+def clean(v): return [r[v] for r in rows if not math.isnan(r[v])]
+cl,ct = clean('cudnn_liver'), clean('cudnn_tumor')
+wl,wt = clean('win_liver'), clean('win_tumor')
+ag=[r['voxel_agreement'] for r in rows]
+print()
+print(f'{\"metric\":>14} {\"cuDNN\":>9} {\"windowed\":>9} {\"delta\":>10}')
+print(f'{\"liver Dice\":>14} {st.mean(cl):9.5f} {st.mean(wl):9.5f} {st.mean(wl)-st.mean(cl):+10.2e}')
+print(f'{\"tumor Dice\":>14} {st.mean(ct):9.5f} {st.mean(wt):9.5f} {st.mean(wt)-st.mean(ct):+10.2e}')
+print()
+print(f'voxel agreement: min {min(ag):.6f}  mean {st.mean(ag):.6f}  perfect(1.0) in {sum(1 for a in ag if a==1.0)}/{len(ag)} cases')
+dl=[b-a for a,b in zip(cl,wl)]; dt=[b-a for a,b in zip(ct,wt)]
+print(f'per-case Dice delta: liver max|d| {max(abs(x) for x in dl):.2e}  tumor max|d| {max(abs(x) for x in dt):.2e}')
+nz=sum(1 for x in dl+dt if x!=0)
+print(f'cases with ANY nonzero Dice difference: {nz}/{len(dl)+len(dt)}')
+PYEOF
+" 2>&1 | tail -12
+# date
+2026-09-19 15:42:47 UTC
+# output
+Activated conda/uv virtual environment at /venv/main
+cases: 27
+
+        metric     cuDNN  windowed      delta
+    liver Dice   0.94735   0.94735  -3.10e-07
+    tumor Dice   0.67366   0.67367  +7.80e-06
+
+voxel agreement: min 0.999999  mean 1.000000  perfect(1.0) in 1/27 cases
+per-case Dice delta: liver max|d| 3.92e-06  tumor max|d| 2.00e-04
+cases with ANY nonzero Dice difference: 37/52

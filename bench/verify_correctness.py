@@ -3,15 +3,16 @@ Correctness verification for every convolution implementation in src/.
 
 This exists because the failure mode observed in the published kernels this
 project reproduces is SILENT: they return zero or partially computed output
-with no error raised. An early benchmark sweep here reported 13,483 TFLOPS on
-one shape, roughly 190x the device peak, which is what timing an empty kernel
-launch measures. No timing in this project is reported for a configuration
-that has not first passed correctness.
+with no error raised. Timing such a launch measures nothing: on one shape it
+gave 13,483 TFLOPS on an RTX 3090, roughly 95 times the device's 142 TFLOPS
+dense FP16 Tensor Core peak. Every implementation the benchmarks in bench/
+time is checked here on representative shapes; the timing scripts do not
+re-check each configuration, so run this first.
 
-Note on TF32: PyTorch enables TF32 on Ampere by default, and its 10-bit
-mantissa produces relative errors near 3e-04 that look like algorithmic bugs
-but are not. Verification must disable it or it will misattribute precision
-to correctness.
+Note on TF32: PyTorch enables TF32 for cuDNN convolutions on Ampere and later
+by default, and its 10-bit mantissa produces relative errors of order 1e-4
+that look like algorithmic bugs but are not. Verification must disable it or
+it will misattribute precision to correctness.
 
 Usage:  python verify_correctness.py
 """

@@ -1,8 +1,10 @@
-"""Recomputes every derived number reported in the write-up from results/.
+"""Recomputes the derived numbers the write-up quotes from committed data in
+results/ (the CLAIMED table).
 
-All reported numbers come from the RTX 3090, the GPU class Im2win's own
-evaluation used. Other devices write their own device-tagged files; this checks
-the ones the write-up quotes.
+Most reported numbers come from the RTX 3090, the GPU class Im2win's own
+evaluation used. The device and host comparisons also read the RTX 4090 files
+and results/host2/, and the trained placement runs span both hosts
+(results/validation/training_host_*.txt).
 
 The measured data in results/ is raw: per-configuration timings. Most of the
 claims made about it are derived, things like win counts, medians, geometric
@@ -29,9 +31,6 @@ ROOT = Path(__file__).resolve().parent.parent
 
 # What the write-up claims. Update these together with the prose, never alone.
 #
-# Counts must match exactly. Rounded measurements are compared within a
-# relative tolerance, since the prose quotes them to a couple of significant
-# figures and the data carries full precision.
 COUNTS = {
     "audit, 3090 session winner changes", "audit, 4090 session winner changes",
     "audit, cross-host winner changes, one session",
@@ -44,65 +43,85 @@ COUNTS = {
 CLAIMED = {
     "dense configurations won": 26,
     "depthwise configurations won": 2,
-    "dense median ratio": 0.95,
-    "depthwise median ratio": 0.84,
-    "best dense ratio": 2.36,
-    "best depthwise ratio": 1.03,
+    "dense median ratio": "0.95",
+    "depthwise median ratio": "0.83",
+    "best dense ratio": "2.36",
+    "best depthwise ratio": "1.03",
     "wins at k>=9": 19,
     "wins at C>=240 and k>=5": 11,
-    "largest single-layer saving, ms": 735,
-    "geo gap, always cuDNN": 1.132,
-    "geo gap, always windowed": 1.160,
-    "geo gap, shape rule": 1.021,
-    "held out, geo gap always cuDNN": 1.126,
-    "held out, geo gap always windowed": 1.098,
-    "held out, geo gap shape rule": 1.041,
+    "largest single-layer saving, ms": "735",
+    "geo gap, always cuDNN": "1.132",
+    "geo gap, always windowed": "1.160",
+    "geo gap, shape rule": "1.021",
+    "held out, geo gap always cuDNN": "1.126",
+    "held out, geo gap always windowed": "1.098",
+    "held out, geo gap shape rule": "1.041",
     "held out, rule agreements out of 32": 24,
-    "training, geo ratio forward": 0.940,
-    "training, geo ratio backward": 1.030,   # rtx3090 only; 0.937 on rtx4090
-    "training, geo ratio full step": 1.015,
-    "training, peak memory median": 2.16,
+    "training, geo ratio forward": "0.940",
+    "training, geo ratio backward": "1.030",   # rtx3090 only; 0.937 on rtx4090
+    "training, geo ratio full step": "1.015",
+    "training, peak memory median": "2.16",
     # Part II, kernel placement
-    "placement, 5-5-5-5 train cost": 2.00,
-    "placement, 3-5-5-7 train cost": 1.32,
-    "placement, 3-3-5-5 train cost": 1.08,
-    "placement, 5-5-5-5 FLOP cost": 1.21,
-    "pilot, tumor spread": 0.0407,
-    "pilot, liver spread": 0.0005,
-    "pilot, tumor paired p": 0.049,
+    "placement, 5-5-5-5 train cost": "2.00",
+    "placement, 3-5-5-7 train cost": "1.32",
+    "placement, 3-3-5-5 train cost": "1.08",
+    "placement, 5-5-5-5 FLOP cost": "1.21",
+    "pilot, tumor spread": "0.0407",
+    "pilot, liver spread": "0.0005",
+    "pilot, tumor paired p": "0.049",
     # Measurement audit: two sessions per host, one host per GPU
     "audit, 3090 session winner changes": 4,
     "audit, 4090 session winner changes": 2,
-    "audit, 3090 session median offset": 0.990,
-    "audit, 4090 session median offset": 0.998,
+    "audit, 3090 session median offset": "0.990",
+    "audit, 4090 session median offset": "0.998",
     "audit, cross-host winner changes, one session": 17,
     "audit, cross-host winner changes, session-confirmed": 13,
     "audit, 3090 rule 2 confirmed by both sessions": 10,
     # Trained placement study (results/training_study.json)
-    "study, kernel 3 liver Dice": 0.9642,
-    "study, 3-3-5-5 liver Dice": 0.9652,
-    "study, 3-5-5-7 liver Dice": 0.9653,
-    "study, 5-5-5-5 liver Dice": 0.9653,
-    "study, 3-5-5-7 scratch liver Dice": 0.9644,
-    "study, kernel 3 continued liver Dice": 0.9650,
-    "study, nnU-Net liver Dice": 0.9546,
-    "study, 3-5-5-7 scratch liver gain": 0.0002,
-    "study, continued liver gain": 0.0008,
-    "study, nnU-Net liver gap": -0.0095,
-    "study, largest placement-vs-continued liver gap": 0.0003,
-    "study, tumour seed spread on present cases": 0.0424,
+    "study, kernel 3 liver Dice": "0.9642",
+    "study, 3-3-5-5 liver Dice": "0.9652",
+    "study, 3-5-5-7 liver Dice": "0.9653",
+    "study, 5-5-5-5 liver Dice": "0.9653",
+    "study, 3-5-5-7 scratch liver Dice": "0.9644",
+    "study, kernel 3 continued liver Dice": "0.9650",
+    "study, nnU-Net liver Dice": "0.9546",
+    "study, 3-5-5-7 scratch liver gain": "0.0002",
+    "study, continued liver gain": "0.0008",
+    "study, nnU-Net liver gap": "-0.0095",
+    "study, largest placement-vs-continued liver gap": "0.0003",
+    "study, tumour seed spread on present cases": "0.0424",
     "study, cases containing tumour": 24,
     # Second RTX 4090 host (results/host2/)
     "hosts, second 4090 host session disagreements": 1,
     "hosts, 4090 host 1 vs host 2 winner changes": 0,
     "hosts, 3090 host vs 4090 host 2 winner changes": 14,
+    "hosts, 4090 host 1 and host 2 settled configurations": 57,
+    "audit, configurations settled on both the 3090 and 4090 hosts": 54,
+    # The C>=240, k>=5 clause across devices
+    "clause 2, 4090 grid wins out of 12": 8,
+    "clause 2, 3090 held-out wins out of 6": 6,
+    "clause 2, 4090 held-out wins out of 6": 3,
+    "held out, rule margin over always cuDNN, 3090 percent": "8.25",
+    "held out, rule margin over always cuDNN, 4090 percent": "0.01",
+    # Part II table and prose
+    "placement, 3-5-5-7 FLOP cost": "1.06",
+    "placement, 3-5-5-7 receptive field": 371,
+    "placement, 5-5-5-5 receptive field": 301,
+    "placement, 3-5-5-7 90 percent mass": 73,
+    "placement, 5-5-5-5 90 percent mass": 67,
+    "study, 5-5-5-5 tumour gain over kernel 3": "+0.0465",
+    "study, 5-5-5-5 tumour gain over continued": "+0.0056",
+    "study, tumour comparisons beyond seed spread": 1,
 }
-# Dice values and their differences are quoted to four decimals, where a
-# relative tolerance would hide errors larger than the effects themselves;
-# they must agree to rounding.
-ABS_TOL = {k: 0.00005 for k in CLAIMED if k.startswith("study,")}
-COUNTS.add("study, cases containing tumour")
-COUNTS.update(k for k in CLAIMED if k.startswith("hosts,"))
+# Integers are counts and must match exactly. Every other claim is written as
+# a string with the decimals the prose prints, and must equal the computed
+# value rounded to those decimals: a relative tolerance would pass a value the
+# prose misrounds.
+COUNTS.update(k for k, v in CLAIMED.items() if isinstance(v, int))
+
+
+def decimals(claim):
+    return len(claim.split(".")[1]) if "." in claim else 0
 
 
 def rule(r):
@@ -200,10 +219,9 @@ def main():
         print("note: receptive_field_cost absent, skipping placement claims\n")
 
     if pilot:
-        # Two formats exist: the original two-run output, with one spread and
-        # one p per class, and the N-run output, which reports every pairwise
-        # comparison. Read either, so extending the pilot does not silently
-        # stop the checks from running.
+        # Two formats are read: the two-run output, with one spread and one p
+        # per class, and the N-run output, which reports every pairwise
+        # comparison.
         for c in pilot.get("classes", {}).values():
             name = c["name"]
             if "pairs" in c:
@@ -240,6 +258,8 @@ def main():
         computed["audit, cross-host winner changes, session-confirmed"] = sum(
             a3["verdicts"][k] is not None and a4["verdicts"][k] is not None
             and a3["verdicts"][k] != a4["verdicts"][k] for k in cells)
+        computed["audit, configurations settled on both the 3090 and 4090 hosts"] = sum(
+            a3["verdicts"][k] is not None and a4["verdicts"][k] is not None for k in cells)
         computed["audit, 3090 rule 2 confirmed by both sessions"] = sum(
             a3["cm"][k] > 1 and a3["tc"][k] > 1 for k in a3["cells"]
             if k[0] >= 240 and k[2] >= 5)
@@ -252,10 +272,42 @@ def main():
         computed["hosts, second 4090 host session disagreements"] = len(h["host2_disagree"])
         computed["hosts, 4090 host 1 vs host 2 winner changes"] = len(h["same_gpu_changes"])
         computed["hosts, 3090 host vs 4090 host 2 winner changes"] = len(h["rtx3090_vs_host2_changes"])
+        computed["hosts, 4090 host 1 and host 2 settled configurations"] = sum(
+            ag["rtx4090"]["verdicts"][k] is not None and k not in h["host2_disagree"]
+            for k in h["cells"])
     else:
         for k in list(CLAIMED):
             if k.startswith("hosts,"):
                 CLAIMED.pop(k)
+
+    cm4 = ROOT / "results" / "crossover_map_rtx4090.json"
+    ho4 = ROOT / "results" / "dispatch_heldout_rtx4090.json"
+    if cm4.exists() and ho4.exists():
+        d4 = [r for r in json.load(open(cm4)) if r.get("mode", "dense") == "dense"]
+        h4 = json.load(open(ho4))
+        c2 = lambda r: r["C"] >= 240 and r["k"] >= 5
+        computed["clause 2, 4090 grid wins out of 12"] = sum(r["ratio"] > 1 for r in d4 if c2(r))
+        computed["clause 2, 3090 held-out wins out of 6"] = sum(
+            r["windowed_actually_faster"] for r in held if c2(r))
+        computed["clause 2, 4090 held-out wins out of 6"] = sum(
+            r["windowed_actually_faster"] for r in h4 if c2(r))
+        for tag, rows in (("3090", held), ("4090", h4)):
+            computed[f"held out, rule margin over always cuDNN, {tag} percent"] = 100 * (
+                geo_gap(rows, lambda r: False)
+                / geo_gap(rows, lambda r: r["rule_says_windowed"]) - 1)
+    else:
+        for k in list(CLAIMED):
+            if k.startswith("clause 2,") or "margin over" in k:
+                CLAIMED.pop(k)
+
+    if rf:
+        computed["placement, 3-5-5-7 FLOP cost"] = by["3-5-5-7"]["gflops"] / base["gflops"]
+    erf_path = ROOT / "results" / "effective_receptive_field.json"
+    if erf_path.exists():
+        erf = {r["placement"]: r for r in json.load(open(erf_path))}
+        for n in ("3-5-5-7", "5-5-5-5"):
+            computed[f"placement, {n} receptive field"] = erf[n]["theoretical"]
+            computed[f"placement, {n} 90 percent mass"] = erf[n]["mass90"]
 
     study_path = ROOT / "results" / "training_study.json"
     if study_path.exists():
@@ -278,6 +330,12 @@ def main():
             abs(v["liver"]["delta"]) for v in sd["upkern_vs_continued"].values())
         computed["study, tumour seed spread on present cases"] = sd["noise_floor"]["tumor"]
         computed["study, cases containing tumour"] = by["nnUNetTrainerV2_MedNeXt_B_place_3_5_5_7_150ep"]["tumor"]["n"]
+        computed["study, 5-5-5-5 tumour gain over kernel 3"] = by["nnUNetTrainerV2_MedNeXt_B_place_5_5_5_5_150ep"]["tumor"]["delta"]
+        computed["study, 5-5-5-5 tumour gain over continued"] = sd["upkern_vs_continued"]["5-5-5-5"]["tumor"]["delta"]
+        computed["study, tumour comparisons beyond seed spread"] = (
+            sum(r.get("tumor", {}).get("beyond_seed_noise", False) for r in sd["rows"])
+            + sum(v["tumor"]["beyond_seed_noise"] for v in sd["upkern_vs_continued"].values())
+            + sum([sd["upkern_vs_scratch"]["tumor"]["beyond_seed_noise"]]))
     else:
         for k in list(CLAIMED):
             if k.startswith("study,"):
@@ -286,14 +344,17 @@ def main():
     print(f"crossover grid: {len(dense)} dense, {len(depth)} depthwise, "
           f"{dense[0].get('trials','?')} trials each")
     print(f"held out grid:  {len(held)} configurations\n")
-    print(f"  {'claim':<48}{'stated':>10}{'computed':>12}")
+    print(f"  {'claim':<60}{'stated':>10}{'computed':>12}")
     ok = True
     for name, claim in CLAIMED.items():
         got = computed[name]
-        tol = 0 if name in COUNTS else ABS_TOL.get(name, 0.015 * abs(claim))
-        good = abs(got - claim) <= tol
+        if isinstance(claim, int):
+            good = got == claim
+        else:
+            d = decimals(claim)
+            good = f"{got:+.{d}f}" == f"{float(claim):+.{d}f}"
         ok &= good
-        print(f"  {name:<48}{claim:>10}{got:>12.4f}  "
+        print(f"  {name:<60}{claim:>10}{got:>12.4f}  "
               f"{'' if good else '<-- MISMATCH'}")
 
     # The rule as coded must match the rule as recorded in the held-out run.

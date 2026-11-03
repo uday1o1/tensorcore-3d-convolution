@@ -1,0 +1,25 @@
+# command
+ssh -o StrictHostKeyChecking=no -o ConnectTimeout=30 <host> "
+source /venv/main/bin/activate
+for trial in 1 2 3; do
+python3 -c \"
+import torch, torch.nn.functional as F, time
+torch.backends.cudnn.benchmark=True
+B,C,H,W,Co,k,s=256,64,56,56,64,3,1
+x=torch.randn(B,C,H,W,device='cuda',dtype=torch.half); w=torch.randn(Co,C,k,k,device='cuda',dtype=torch.half)
+oh=(H-k)//s+1; ops=2*B*Co*oh*oh*C*k*k
+for _ in range(10): F.conv2d(x,w,stride=s)
+torch.cuda.synchronize(); t0=time.time()
+for _ in range(30): F.conv2d(x,w,stride=s)
+torch.cuda.synchronize(); dt=(time.time()-t0)/30
+print(f'  fresh process trial: {ops/dt/1e12:.2f} TFLOPS ({dt*1000:.3f} ms), free mem {torch.cuda.mem_get_info()[0]/1e9:.1f} GB')
+\"
+done
+" 2>&1 | tail -5
+# date
+2026-09-19 07:57:58 UTC
+# output
+Activated conda/uv virtual environment at /venv/main
+  fresh process trial: 17.62 TFLOPS (3.124 ms), free mem 24.6 GB
+  fresh process trial: 21.22 TFLOPS (2.593 ms), free mem 24.6 GB
+  fresh process trial: 21.07 TFLOPS (2.613 ms), free mem 24.6 GB

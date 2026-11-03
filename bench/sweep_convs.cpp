@@ -58,7 +58,8 @@ int main(int argc, char *argv[])
         maxg = g > maxg ? g : maxg;
     }
     double meang = (operations / (sum_e2/number)) / GIGA;
-    // verify the kernel actually produced output
+    // count nonzero outputs and a checksum so a kernel that computed nothing
+    // shows up in the printed line
     half *op = output_d.getDataPtr();
     size_t nz = 0; double checksum = 0.0;
     size_t total = output_d.batch*output_d.channel*output_d.height*output_d.width;

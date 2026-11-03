@@ -1,26 +1,26 @@
 """MedNeXt-B kernel 3, 150 epochs, seed 1.
 
-One of a pair of trainers differing only in random seed. They exist to measure
-the run-to-run Dice spread of this training setup, which decides whether the
-kernel-placement study is measurable at all.
+One of a pair of trainers (seeds 1 and 2) differing only in random seed.
+Together they measure the run-to-run Dice spread of this training setup, the
+noise floor against which kernel placements are compared.
 
-The motivation is a number from MedNeXt's own paper: uniform kernel 5 with
-UpKern initialization improves mean Dice by roughly 0.2 points over kernel 3
-(84.03 to 84.23 on BTCV, 86.71 to 87.06 on AMOS22). A study that compares
-kernel placements is therefore trying to resolve differences of that order. If
-two identically configured runs of this setup differ by more than that, the
-comparison cannot be made on a single run per configuration and needs either
-repeats or a redesign. Running this first is cheaper than discovering it after
-four full training runs.
+The scale that floor must resolve comes from MedNeXt's own paper: uniform
+kernel 5 with UpKern initialization improves Dice by roughly 0.2 points over
+kernel 3 (84.01 to 84.23 on BTCV, 89.14 to 89.38 on AMOS22). If two identically
+configured runs differ by more than that, one run per configuration cannot
+resolve the comparison.
 
-nnU-Net's base trainer hardcodes seed 12345 when deterministic is set, so the
-seed is reapplied here after the parent constructor. Network initialization
-happens later, in initialize(), so both weight initialization and the data
-augmentation stream differ between the two trainers.
+nnU-Net's base trainer seeds numpy and torch with 12345 only when deterministic
+is set, which it is not by default, so the seed is applied here after the
+parent constructor. Network initialization happens later, in initialize(), so
+this seed fixes the weight initialization. The data augmentation workers seed
+themselves from the OS (batchgenerators' MultiThreadedAugmenter with
+seeds=None), so the augmentation stream differs between any two runs
+regardless of this seed.
 
-These two runs are not overhead. Both are the 3-3-3-3 configuration, so one
-serves as the study's baseline and as the UpKern source for the large-kernel
-variants, and the pair gives the error bar.
+Both trainers are the 3-3-3-3 configuration. The seed 1 trainer is also the
+placement study's baseline: a separate run of it supplies the baseline scores
+and the UpKern source checkpoint for the large-kernel variants.
 """
 import numpy as np
 import torch
@@ -40,5 +40,5 @@ class nnUNetTrainerV2_MedNeXt_B_k3_150ep_s1(nnUNetTrainerV2_MedNeXt_B_kernel3):
         torch.manual_seed(SEED)
         if torch.cuda.is_available():
             torch.cuda.manual_seed_all(SEED)
-        self.print_to_log_file(f"variance pilot: reseeded to {SEED} "
-                               f"(nnU-Net default is 12345)")
+        self.print_to_log_file(f"variance pilot: seeded with {SEED} "
+                               f"(nnU-Net seeds 12345 only with --deterministic)")

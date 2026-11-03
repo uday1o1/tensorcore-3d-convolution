@@ -1,7 +1,7 @@
 """Effective receptive field of each kernel placement, measured.
 
-Section 7.1 ranks placements by theoretical receptive field, which counts how
-far information could travel. It is an upper bound and it weights every path
+bench_receptive_field.py reports each placement's theoretical receptive field,
+which counts how far information could travel. It is an upper bound and it weights every path
 equally. The effective receptive field is what the network actually uses: it is
 smaller, roughly Gaussian, and it does not have to agree with the count.
 
@@ -11,7 +11,7 @@ stage 0, where the jump is 1, so it widens the field directly at input
 resolution. The 3-5-5-7 placement buys its field in deep stages, where each
 contribution is spread across the upsampling path and may be diluted. If that
 dilution is strong enough, the dominance of 3-5-5-7 over 5-5-5-5 could weaken
-or invert, and that claim is load bearing for Part II.
+or invert, and that dominance is the claim under test.
 
 Method, the standard one: run a forward pass on an input that requires
 gradient, backpropagate from a single centre voxel of the output, and read the
@@ -24,8 +24,8 @@ spatial extent of nonzero input gradient. Reported two ways:
 
 Weights are the initialization, not a trained network. This measures the
 architecture's reach, not what training does with it, which is the right
-quantity for a design question and the only one available given the accuracy
-axis is not measurable here (Section 7.2).
+quantity for a design question; trained accuracy is in
+results/training_study.json.
 
 Usage:  python bench_effective_receptive_field.py
 """
@@ -34,7 +34,6 @@ import sys
 from pathlib import Path
 
 import torch
-import torch.nn as nn
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))
@@ -47,10 +46,11 @@ PLACEMENTS = {
     "3-5-5-7": [3, 5, 5, 7],
     "5-5-5-5": [5, 5, 5, 5],
 }
-# The theoretical receptive field of these placements is 151 to 371 voxels,
-# larger than any patch that fits in memory for this architecture. Support is
-# therefore clipped by the input and carries no information; the mass measures
-# are what can actually be compared. See the clipping check in main().
+# The theoretical receptive field of these placements is 151 to 371 voxels
+# (results/effective_receptive_field.json), larger than the 96 cubed patch used
+# here. Support is therefore clipped by the input and carries no information;
+# the mass measures are what can actually be compared. See the clipping check
+# in main().
 PATCH = 96
 MASS_FRACTIONS = (0.5, 0.9)
 
@@ -162,8 +162,8 @@ def main():
     a = next((r for r in rows if r["placement"] == "3-5-5-7"), None)
     b = next((r for r in rows if r["placement"] == "5-5-5-5"), None)
     if a and b:
-        print(f"\nPart II dominance claim, 3-5-5-7 against 5-5-5-5 "
-              f"(3-5-5-7 costs 1.32x, 5-5-5-5 costs 2.00x):")
+        print(f"\ndominance claim, 3-5-5-7 against 5-5-5-5 (training step cost "
+              f"1.32x and 2.00x, results/receptive_field_cost.json):")
         clipped = any(r["support"] >= PATCH for r in rows)
         for key in ("theoretical", "support", "mass90", "mass50"):
             if key == "support" and clipped:
@@ -174,13 +174,13 @@ def main():
             print(f"  {key:<12} {a[key]:>5} vs {b[key]:>5}   "
                   f"{'HOLDS' if holds else 'DOES NOT HOLD'}")
         if clipped:
-            print("\n  Support equals the patch for every placement, so the"
-                  "\n  gradient reaches the whole input and the measure saturates."
-                  "\n  The theoretical field exceeds any patch this architecture"
-                  "\n  can train on, which makes that figure an unreachable bound"
-                  "\n  rather than merely a loose one. Compare the mass columns.")
-        print("\n  Dominance requires more reach at lower cost. Cost is settled"
-              "\n  by measurement in Section 7.1; if a reach column above does not"
+            print("\n  Support reaches the patch boundary, so the gradient reaches"
+                  "\n  the whole input and that measure saturates and cannot rank"
+                  "\n  placements. The theoretical field exceeds this patch, which"
+                  "\n  makes it an unreachable bound here rather than merely a"
+                  "\n  loose one. Compare the mass columns.")
+        print("\n  Dominance requires more reach at lower cost. Cost is measured"
+              "\n  by bench_receptive_field.py; if a reach column above does not"
               "\n  hold, the claim must be narrowed to the columns that do.")
     return 0
 

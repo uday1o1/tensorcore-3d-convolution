@@ -12,7 +12,7 @@ def im2win_conv2d(x, w, stride=1):
     u = x.unfold(2, k, stride)                       # (B,C,oh,W,k)
     u = u.permute(0, 2, 1, 4, 3).contiguous()        # (B,oh,C,k,W)
     u = u.reshape(B * oh, C * k, W)                  # (B*oh, C*k, W)
-    # filter: (Co,C,k,k) -> (Co, C*k, k) matching (c_kernelrow, channel) grouping
+    # filter: (Co,C,k,k) -> (Co, C*k, k), channel-major (c, kh) like u
     w1 = w.reshape(Co, C * k, k)                     # (Co, C*k, kw), matches (c,kh) grouping
     o = F.conv1d(u, w1, stride=stride)               # (B*oh, Co, ow)
     ow = o.shape[-1]
@@ -86,7 +86,8 @@ class WindowedConv3d(nn.Module):
     '''Drop-in replacement for nn.Conv3d using windowed convolution.
     Supports the subset nnU-Net uses: symmetric padding, square kernels, bias.
     Falls back to cuDNN for shapes the windowed path cannot serve
-    (kernel_size 1, or grouped conv), matching the paper's stated scope.'''
+    (kernel_size 1, dilation > 1, or grouped conv other than fully
+    depthwise).'''
     def __init__(self, in_channels, out_channels, kernel_size, stride=1,
                  padding=0, dilation=1, groups=1, bias=True):
         super().__init__()

@@ -1,0 +1,25 @@
+# command
+ssh -o StrictHostKeyChecking=no -o ConnectTimeout=30 <host> "
+grep -n 'gridSize\|blockSize\|dim3' /workspace/im2win/src/tensorCore/im2win_async_128x64_4_base_conv9.cu | head -12
+echo '--- surrounding context ---'
+grep -n 'dim3 gridSize' -B8 -A3 /workspace/im2win/src/tensorCore/im2win_async_128x64_4_base_conv9.cu | head -25
+" 2>&1 | tail -30
+# date
+2026-09-19 07:02:39 UTC
+# output
+457:    const dim3 blockSize(THREADS_PER_BLOCK);               // 32x8=256
+458:    const dim3 gridSize(CEIL_DIV(M, TLIE_M_PER_BLOCK), 18, // 2
+487:        im2winConvCUDAimplentNCHWHPCkernel1<<<gridSize, blockSize>>>(g_inptr + i * ti_bchw, g_filptr, g_outptr + i * to_bchw, d_dims_a, d_dims_b, d_dims_c, s_w);
+--- surrounding context ---
+450-    size_t ti_bchw = block_batch * input_win.channel * input_win.height * input_win.width;
+451-    // 分块后每一块的 output 4个维度乘积
+452-    size_t to_bchw = block_batch * output.channel * output.height * output.width;
+453-    const size_t M = output_channel;                             // conv1 96
+454-    const size_t N = block_batch * output_height * output_width; // conv1 128x55x55
+455-
+456-    // 分配每个线程块中包含多少线程
+457-    const dim3 blockSize(THREADS_PER_BLOCK);               // 32x8=256
+458:    const dim3 gridSize(CEIL_DIV(M, TLIE_M_PER_BLOCK), 18, // 2
+459-                        54 * 6);
+460-
+461-    // // 索引预计算

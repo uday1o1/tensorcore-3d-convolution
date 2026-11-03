@@ -1,8 +1,9 @@
 """End to end test of the dispatcher on real segmentation networks.
 
-bench_end_to_end.py answers what the windowed paradigm costs if you adopt it
-everywhere: on a standard kernel size 3 nnU-Net it is 2.34x slower on 3.9x the
-memory. The crossover map says that is the wrong way to adopt it.
+bench_end_to_end.py measures what the windowed paradigm costs if you adopt it
+everywhere, on a standard kernel size 3 nnU-Net. The crossover map says that
+is the wrong way to adopt it: at kernel size 3 the windowed path loses in
+every shape measured.
 
 This benchmark asks the question the map actually poses. A dispatcher has to
 clear two bars to be worth anything:
@@ -121,12 +122,10 @@ def run_one(k, patch):
             rel = (out - base).abs().max().item() / max(base.abs().max().item(), 1e-12)
 
         # The exactness check above runs in fp32 with TF32 off, and the
-        # autotune policy decides on its first forward pass. Timing then runs
-        # under fp16 autocast. Left alone, autotune picks a path for one
-        # precision regime and is measured in another, and it showed up as
-        # autotune scoring 0.425x, identical to always-windowed and worse than
-        # the rule, which is impossible for a policy that is supposed to be an
-        # upper bound. Clear the cache and let it decide under autocast.
+        # autotune policy decides on its first forward pass. Timing runs under
+        # fp16 autocast, so a choice made during the check would be made for
+        # one precision regime and measured in another. Clear the cache and let
+        # it decide under autocast.
         for m in model.modules():
             if hasattr(m, "_choice"):
                 m._choice.clear()
@@ -159,11 +158,10 @@ def main(kernels):
     patch = PATCH
     out = {}
     for k in kernels:
-        # large kernels at 128^3 exceed 24GB; shrink the patch and say so
+        # kernel sizes above 3 run at a 64^3 patch; say so
         p = patch if k <= 3 else 64
         if p != patch:
-            print(f"\n(note: kernel size {k} uses patch {p}^3, since {patch}^3 "
-                  f"does not fit in 24GB at this kernel size)")
+            print(f"\n(note: kernel size {k} uses patch {p}^3 rather than {patch}^3)")
         try:
             out[k] = run_one(k, p)
         except torch.cuda.OutOfMemoryError:

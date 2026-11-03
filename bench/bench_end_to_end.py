@@ -7,14 +7,15 @@ The substitution runs on identical weights, so any output difference is the
 kernel's numerics alone, with no training variance to confound it.
 
 Also profiles where GPU time actually goes, which bounds what any convolution
-kernel can address. FLOP share badly overstates this: convolution is 99.6
-percent of this network's FLOPs but 65.6 percent of its inference time.
+kernel can address. FLOP share badly overstates this: convolution carries
+nearly all of this network's FLOPs but a much smaller share of its GPU time,
+as the breakdown printed at the end shows.
 
-A trap this script exists to avoid: an earlier version reported identical
-timings for both configurations because `child.dilation` is the tuple
-`(1,1,1)` and `(1,1,1) == 1` is False, which silently disabled the windowed
-path on every layer and measured cuDNN against itself. The substitution count
-is printed so that cannot happen unnoticed.
+A trap this script guards against: nn.Conv3d stores dilation as the tuple
+`(1,1,1)`, and `(1,1,1) == 1` is False, so a check against the integer 1
+silently disables the windowed path on every layer and measures cuDNN against
+itself. The substitution count is printed, and the script stops if no layer
+uses the windowed path.
 
 Usage:  python bench_end_to_end.py
 """

@@ -3,16 +3,19 @@
 The rule in src/dispatch.py was read off the crossover grid. Evaluating it on
 that same grid would only measure how well it describes its own training data,
 which is not a claim about anything. This benchmark evaluates it on a disjoint
-set of shapes: channel widths, spatial extents, and kernel sizes that do not
-appear in the grid at all.
+set of shapes: channel widths and spatial extents that do not appear in the
+grid at all, at kernel sizes 3 to 9.
 
-Four policies are compared against a per-shape oracle that always picks the
+Three policies are compared against a per-shape oracle that always picks the
 faster of the two algorithms after the fact:
 
   cudnn     always implicit GEMM, the incumbent
   windowed  always the windowed method, what the literature implicitly proposes
   rule      decide from shape alone, at zero runtime cost
-  autotune  time both once per shape and keep the winner
+
+A fourth policy, autotune (time both once per shape and keep the winner), is
+checked first against shapes the crossover grid already settled, as a guard on
+this device's timing.
 
 The headline metric is the geometric mean of (policy time / oracle time) over
 shapes. The arithmetic total is reported too but is the wrong summary here:
@@ -44,8 +47,9 @@ from benchenv import (results_dir, device_tag, device_meta, timed_pair,
 
 torch.backends.cudnn.benchmark = True
 
-# Deliberately disjoint from bench_crossover.py's grid, which uses
-# C in {30,60,120,240}, spatial in {16,32,64}, k in {3,5,7,9,11}.
+# Channel widths and spatial extents deliberately disjoint from
+# bench_crossover.py's grid (C in {30,60,120,240}, spatial in {16,32,64}), so
+# no shape repeats; kernel sizes are a subset of its {3,5,7,9,11}.
 CHANNELS = [48, 96, 192, 320]
 SPATIAL = [24, 48]
 KERNELS = [3, 5, 7, 9]
@@ -68,15 +72,16 @@ def timeit(fn, n=8):
 def preflight():
     """Check the autotuner reproduces decisions the grid already settled.
 
-    The autotuner is used as the oracle the rule is scored against, so it has
-    to be trustworthy before any of the held-out numbers mean anything.
+    The autotuner times both algorithms on the real input, the same question
+    the held-out oracle answers from this script's own timings, so if it
+    misjudges shapes the grid already settled, timing on this device is not
+    trustworthy and none of the held-out numbers mean anything.
 
-    The reference shapes are read from THIS DEVICE's own crossover map. An
-    earlier version hardcoded values measured on an RTX 3090, which silently
-    checked one device's autotuner against another device's ground truth. That
-    is not a hypothetical: C240 at 64 cubed with kernel size 5 measures 1.45 on
-    an RTX 3090 and 0.99 on an RTX 4090, opposite winners, so the hardcoded
-    check would have validated a wrong answer as right.
+    The reference shapes are read from THIS DEVICE's own crossover map. Values
+    from another device would check this device's autotuner against that
+    device's ground truth, and the devices disagree: C240 at 64 cubed with
+    kernel size 5 measures 1.42 on an RTX 3090 and 0.99 on an RTX 4090
+    (results/crossover_map_rtx3090.json, _rtx4090.json), opposite winners.
 
     Shapes are chosen for being unambiguous on this device, furthest from
     parity, since a cell near 1.0 cannot adjudicate anything.
@@ -95,8 +100,9 @@ def preflight():
         print(f"preflight: no crossover map for {device_tag()}, falling back to "
               f"RTX 3090 values. Run bench_crossover.py on this device first for "
               f"a meaningful check.")
-        known = {(60, 64, 3): 0.63, (240, 64, 5): 1.45, (240, 16, 3): 0.84,
-                 (120, 64, 9): 1.28, (30, 32, 5): 0.62}
+        # From results/crossover_map_rtx3090.json.
+        known = {(60, 64, 3): 0.65, (240, 64, 5): 1.42, (240, 16, 3): 0.84,
+                 (120, 64, 9): 1.28, (30, 32, 5): 0.65}
     print("preflight: autotuner against shapes the grid already settled")
     hdr = ("shape", "grid", "truth", "autotune", "agree")
     print(f"  {hdr[0]:>14}{hdr[1]:>8}{hdr[2]:>8}{hdr[3]:>10}{hdr[4]:>7}")
@@ -119,8 +125,8 @@ def preflight():
 
 def main(trials=5):
     if not preflight():
-        print("ABORT: the autotuner disagrees with already-measured shapes, so it "
-              "cannot serve as the oracle. Fix its timing before trusting anything below.")
+        print("ABORT: the autotuner disagrees with already-measured shapes, so timing "
+              "on this device is not trustworthy. Fix that before trusting anything below.")
         return 1
     rows = []
     meta = device_meta()
@@ -158,9 +164,10 @@ def main(trials=5):
                           flush=True)
                     del x, w
                     torch.cuda.empty_cache()
-                except (torch.cuda.OutOfMemoryError, RuntimeError):
+                except (torch.cuda.OutOfMemoryError, RuntimeError) as e:
                     torch.cuda.empty_cache()
-                    print(f"{C:5d}{sp:4d}{k:3d}{out:5d}      oom", flush=True)
+                    print(f"{C:5d}{sp:4d}{k:3d}{out:5d}  skipped ({type(e).__name__})",
+                          flush=True)
 
     if not rows:
         print("no configurations measured")
@@ -194,9 +201,9 @@ def main(trials=5):
     print(f"rule vs always-windowed: {g_win/g_rule:.3f}x better")
 
     # The rule is only worth stating if it beats both pure strategies by a
-    # margin worth the complexity. An earlier version declared HOLDS on any
-    # improvement at all and reported success on an RTX 4090 where the rule
-    # beat always-cuDNN by 0.01 percent, which is a tie dressed up as a win.
+    # margin worth the complexity. Any improvement at all is not enough: on
+    # the RTX 4090 the rule beats always-cuDNN by 0.01 percent
+    # (results/dispatch_heldout_rtx4090.json), a tie rather than a win.
     MARGIN = 0.01   # 1 percent
     gain_c, gain_w = g_cud / g_rule - 1, g_win / g_rule - 1
     if gain_c > MARGIN and gain_w > MARGIN:
@@ -214,14 +221,15 @@ def main(trials=5):
     under = sum(1 for r in rows if not r["rule_says_windowed"]
                 and r["windowed_actually_faster"])
     if over or under:
-        lean = "over-aggressive" if over > under else "too conservative"
-        print(f"  the rule leans {lean} here: {over} over-aggressive, "
-              f"{under} too conservative")
+        lean = ("over-aggressive" if over > under
+                else "too conservative" if under > over else "evenly split")
+        print(f"  the rule's errors here: {lean} ({over} over-aggressive, "
+              f"{under} too conservative)")
 
     # Where the rule is wrong, how much does it cost?
     bad = [r for r in rows if r["rule_says_windowed"] != r["windowed_actually_faster"]]
     if bad:
-        print(f"\n{len(bad)} disagreements:")
+        print(f"\n{len(bad)} disagreements, the {min(len(bad), 6)} costliest:")
         for r in sorted(bad, key=lambda r: -abs(r["cudnn_ms"] - r["win_ms"]))[:6]:
             cost = (r["win_ms"] - r["cudnn_ms"]) if r["rule_says_windowed"] \
                 else (r["cudnn_ms"] - r["win_ms"])

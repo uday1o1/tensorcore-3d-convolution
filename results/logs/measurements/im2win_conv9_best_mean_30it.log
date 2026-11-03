@@ -1,0 +1,36 @@
+# command
+ssh -o StrictHostKeyChecking=no -o ConnectTimeout=30 <host> "
+cd /workspace/im2win/sweepbuild
+python3 - << 'PYEOF'
+p='sweep_convs.cpp'; s=open(p).read()
+# add a back-to-back timing mode: launch N kernels, sync once
+s = s.replace('''    double maxg = 0, e1 = 0, e2 = 0;
+    for (int i = 0; i < number; ++i) {
+        e1 = 0; e2 = 0;
+        output_d.setZero();
+        conv_withTimer1(output_d, input_d, filter_d, input_win, filter_win, stride, T, e1, e2);
+        double g = (operations / e2) / GIGA;
+        maxg = g > maxg ? g : maxg;
+    }''','''    double maxg = 0, e1 = 0, e2 = 0;
+    double sum_e2 = 0;
+    for (int i = 0; i < number; ++i) {
+        e1 = 0; e2 = 0;
+        output_d.setZero();
+        conv_withTimer1(output_d, input_d, filter_d, input_win, filter_win, stride, T, e1, e2);
+        double g = (operations / e2) / GIGA;
+        sum_e2 += e2;
+        maxg = g > maxg ? g : maxg;
+    }
+    double meang = (operations / (sum_e2/number)) / GIGA;''')
+s = s.replace('cout << \"TFLOPS \" << maxg/1000.0','cout << \"TFLOPS_best \" << maxg/1000.0 << \" TFLOPS_mean \" << meang/1000.0')
+open(p,'w').write(s); print('patched')
+PYEOF
+export CUDA_SOURCE_NAME='im2win_async_128x64_4_base_conv9.cu'; export CUDA_PATH=/usr/local/cuda
+ninja 2>&1 | grep -E '^FAILED|error:' | head -3
+./sweep 256 64 56 56 64 3 1 2>&1 | tail -1
+" 2>&1 | tail -6
+# date
+2026-09-19 07:56:59 UTC
+# output
+patched
+TFLOPS_best 37.0375 TFLOPS_mean 36.4182 GFLOP 55.0377 nonzero 47775744/47775744 checksum 6.89189e+09

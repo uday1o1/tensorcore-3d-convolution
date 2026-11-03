@@ -1,55 +1,63 @@
 # Raw run logs
 
 Verbatim stdout from the runs that produced the reported numbers, kept because
-a log is the authentic record of what was executed and when.
+a log is the authentic record of what was executed and when. The Part I
+measurements made with short inline scripts (the Im2win reproduction, the
+generality audit, correctness, dimensional scaling, FFT, profiling and the
+whole-network substitution) are in `measurements/`, indexed in its own README.
+
+## Benchmarks
 
 | Log | Produced | Regenerate with |
 |---|---|---|
-| `crossover7.log` | `../crossover_map.json`, dense and depthwise at 7 trials | `python bench/bench_crossover.py 7` |
-| `dispatch.log` | `../dispatch_heldout.json`, held-out rule test | `python bench/bench_dispatch.py 5` |
+| `crossover7.log` | `../crossover_map_rtx3090.json`, dense and depthwise at 7 trials | `python bench/bench_crossover.py 7` |
+| `dispatch.log` | `../dispatch_heldout_rtx3090.json`, held-out rule test | `python bench/bench_dispatch.py 5` |
+| `traincross.log` | `../training_crossover_rtx3090.json`, forward against full training step | `python bench/bench_training_crossover.py 5` |
 | `netdispatch.log` | end-to-end dispatcher at kernel sizes 3 and 5 | `python bench/bench_dispatch_network.py 3 5` |
 | `netdispatch79.log` | end-to-end dispatcher at kernel sizes 7 and 9 | `python bench/bench_dispatch_network.py 7 9` |
-
-The two `netdispatch` runs predate the change that made
-`bench_dispatch_network.py` write `../dispatch_network.json`, so their numbers
-live here rather than in a JSON file. Re-running either command now produces
-that JSON.
-
 | `cross4090.log` | `../crossover_map_rtx4090.json` | `python bench/bench_crossover.py 7` |
 | `train4090.log` | `../training_crossover_rtx4090.json` | `python bench/bench_training_crossover.py 5` |
 | `disp4090.log` | `../dispatch_heldout_rtx4090.json` | `python bench/bench_dispatch.py 5` |
+| `crossover_host2_s1.log`, `crossover_host2_s2.log` | `../host2/crossover_map_s1.json`, `../host2/crossover_map_s2.json`, two sessions on the second RTX 4090 host | `python bench/bench_crossover.py 7`, run twice, renaming the output after each |
 
-Training logs from the placement study, as nnU-Net writes them (per-epoch
-losses, online Dice estimate, epoch time). The scores reported for each run
-are in `../validation/`, not the online estimate here. The kernel 3 and
-3-5-5-7 UpKern runs trained on the RTX 3090 host, the rest on the RTX 4090
-host; `../validation/training_host_*.txt` records each.
+`bench_dispatch_network.py` writes `../dispatch_network.json`; the two
+`netdispatch` runs have no committed JSON, so their numbers live in these logs.
+`disp4090.log` validates its preflight table against the RTX 3090 reference
+values; that affects only the gate, not the measurement, since the held-out
+comparison times both algorithms directly.
 
-| Log | Run | Regenerate with |
+## Training
+
+Training logs as nnU-Net writes them (per-epoch losses, online Dice estimate,
+epoch time). The scores reported for each run are the per-case summaries in
+`../validation/`, not the online estimate here.
+
+| Log | Run | Training host |
 |---|---|---|
-| `train_k3_s1.log` | MedNeXt-B kernel 3, 150 epochs | `scripts/setup_vast.sh train nnUNetTrainerV2_MedNeXt_B_k3_150ep_s1` |
-| `train_place_3_5_5_7.log` | 3-5-5-7, UpKern from the kernel 3 run | `scripts/setup_vast.sh train nnUNetTrainerV2_MedNeXt_B_place_3_5_5_7_150ep` |
-| `train_place_3_3_5_5.log` | 3-3-5-5, UpKern from the kernel 3 run | `scripts/setup_vast.sh train nnUNetTrainerV2_MedNeXt_B_place_3_3_5_5_150ep` |
-| `train_place_5_5_5_5.log` | 5-5-5-5, UpKern from the kernel 3 run | `scripts/setup_vast.sh train nnUNetTrainerV2_MedNeXt_B_place_5_5_5_5_150ep` |
-| `train_place_3_3_3_3_continued.log` | kernel 3 continued from the kernel 3 run, the UpKern control | `scripts/setup_vast.sh train nnUNetTrainerV2_MedNeXt_B_place_3_3_3_3_continued_150ep` |
-| `train_nnunet.log` | nnU-Net, same plans and fold | `scripts/setup_vast.sh train nnUNetTrainerV2_150ep` |
-| `train_place_3_5_5_7_scratch.log` | 3-5-5-7, from scratch | `scripts/setup_vast.sh train nnUNetTrainerV2_MedNeXt_B_place_3_5_5_7_scratch_150ep` |
+| `pilot_s1.log`, `pilot_s2.log` | MedNeXt-B kernel 3, seeds 1 and 2, the seed-spread pair behind `../variance_pilot.json` | the RTX 3090 benchmark host |
+| `train_k3_s1.log` | MedNeXt-B kernel 3, the baseline and UpKern source | RTX 3090, `../validation/training_host_rtx3090.txt` |
+| `train_place_3_5_5_7.log` | 3-5-5-7, UpKern from the kernel 3 run | RTX 3090, `../validation/training_host_rtx3090.txt` |
+| `train_place_3_3_5_5.log` | 3-3-5-5, UpKern from the kernel 3 run | RTX 4090, `../validation/training_host_rtx4090.txt` |
+| `train_place_5_5_5_5.log` | 5-5-5-5, UpKern from the kernel 3 run | RTX 4090, `../validation/training_host_rtx4090.txt` |
+| `train_place_3_3_3_3_continued.log` | kernel 3 continued from the kernel 3 run, the UpKern control | RTX 4090, `../validation/training_host_rtx4090.txt` |
+| `train_place_3_5_5_7_scratch.log` | 3-5-5-7, from scratch | RTX 4090, `../validation/training_host_rtx4090.txt` |
+| `train_nnunet.log` | nnU-Net, same plans and fold | RTX 4090, `../validation/training_host_rtx4090.txt` |
 
-Two hosts, with PyTorch and cuDNN pinned to the same versions on both so
-that cross-device differences are not library version (they remain host
-as well as GPU differences):
+Each run is regenerated with `scripts/setup_vast.sh train <Trainer>`, where the
+trainer is the file of the same name in `src/trainers/`. The UpKern and
+continued runs need the kernel 3 run's final checkpoint, so it trains first.
 
-- RTX 3090, sm_86, driver 595.71.05
-- RTX 4090, sm_89, 128 SMs, driver 570.144
+## Hosts
 
-Both on CUDA 12.8, PyTorch 2.11.0+cu128, Python 3.12, cuDNN 9.19.0.
+PyTorch 2.11.0+cu128 (CUDA 12.8) with cuDNN 9.19.0 on every host, so that
+cross-device differences are not library version; they remain host as well as
+GPU differences.
 
-The 4090's host shipped PyTorch 2.8.0 with cuDNN 9.10.2. Comparing against
-that would have confounded hardware with library version, since cuDNN's
-version determines which algorithms it can select, so the 4090 runs used an
-isolated environment pinned to match the 3090 exactly.
-
-`disp4090.log` was produced before the preflight was made device-aware, so its
-preflight table validates against RTX 3090 reference values. That affects only
-the gate, not the measurement: the held-out comparison times both algorithms
-directly and does not use the autotuner.
+- RTX 3090 benchmark host: sm_86, driver 595.71.05
+  (`measurements/host_rtx3090_main_versions.log`).
+- RTX 4090 benchmark host: sm_89, 128 SMs; versions recorded in each row of the
+  `rtx4090` JSON files.
+- Second RTX 4090 host, also the RTX 4090 training host: driver 580.95.05, AMD
+  EPYC 7742, 400 W power limit (`../host2/host.txt`).
+- RTX 3090 training host: driver 580.126.09, AMD Ryzen 9 5950X, 320 W power
+  limit (`../validation/training_host_rtx3090.txt`).

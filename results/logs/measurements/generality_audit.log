@@ -1,0 +1,34 @@
+# command
+ssh -o StrictHostKeyChecking=no -o ConnectTimeout=30 <host> "
+cd /workspace/im2win/sweepbuild
+probe() { r=\$(timeout 300 ./sweep \$1 2>&1 | tail -1); nz=\$(echo \"\$r\" | grep -o 'nonzero [0-9]*/[0-9]*'); tf=\$(echo \"\$r\" | awk '{print \$2}'); ok=\$(echo \"\$nz\" | awk -F'[ /]' '{if(\$2>0) print \"OK\"; else print \"ZERO\"}'); printf '%-28s %-6s %s\n' \"\$1\" \"\$ok\" \"\$nz\"; }
+echo 'baseline conv9:'
+probe '256 64 56 56 64 3 1'
+echo 'vary BATCH (C=64,HW=56):'
+probe '128 64 56 56 64 3 1'
+probe '16 64 56 56 64 3 1'
+probe '4 64 56 56 64 3 1'
+echo 'vary CHANNELS (B=256,HW=56):'
+probe '256 32 56 56 32 3 1'
+probe '256 128 56 56 128 3 1'
+probe '256 30 56 56 30 3 1'
+echo 'vary SPATIAL (B=256,C=64):'
+probe '256 64 32 32 64 3 1'
+probe '256 64 128 128 64 3 1'
+" 2>&1 | tail -16
+# date
+2026-09-19 07:01:46 UTC
+# output
+baseline conv9:
+256 64 56 56 64 3 1          OK     nonzero 47775744/47775744
+vary BATCH (C=64,HW=56):
+128 64 56 56 64 3 1          ZERO   nonzero 0/23887872
+16 64 56 56 64 3 1           ZERO   nonzero 0/2985984
+4 64 56 56 64 3 1            ZERO   nonzero 0/746496
+vary CHANNELS (B=256,HW=56):
+256 32 56 56 32 3 1          OK     nonzero 16685516/23887872
+256 128 56 56 128 3 1        OK     nonzero 95551488/95551488
+256 30 56 56 30 3 1          ZERO   nonzero 0/22394880
+vary SPATIAL (B=256,C=64):
+256 64 32 32 64 3 1          ZERO   nonzero 0/14745600
+256 64 128 128 64 3 1        OK     nonzero 47775744/260112384

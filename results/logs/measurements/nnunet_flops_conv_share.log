@@ -1,0 +1,39 @@
+# command
+ssh -o StrictHostKeyChecking=no -o ConnectTimeout=30 <host> "
+source /venv/main/bin/activate
+python3 << 'PYEOF'
+import torch, torch.nn as nn, time
+from fvcore.nn import FlopCountAnalysis
+from nnunet_mednext.network_architecture.generic_UNet import Generic_UNet
+
+def build(base):
+    return Generic_UNet(1, base, 3, 5, 2, 2, nn.Conv3d, nn.InstanceNorm3d,
+        {'eps':1e-5,'affine':True}, nn.Dropout3d, {'p':0,'inplace':True},
+        nn.LeakyReLU, {'negative_slope':1e-2,'inplace':True},
+        False, False, lambda x:x, None,
+        [[2,2,2]]*5, [[3,3,3]]*6, False, True, True).cuda()
+
+for base in [30, 32]:
+    m = build(base)
+    p = sum(q.numel() for q in m.parameters())
+    x = torch.zeros(1,1,128,128,128, device='cuda')
+    f = FlopCountAnalysis(m, x); f.unsupported_ops_warnings(False)
+    tot = f.total()
+    byop = f.by_operator()
+    conv = sum(v for k,v in byop.items() if 'conv' in k)
+    widths=set()
+    for n,mod in m.named_modules():
+        if isinstance(mod, nn.Conv3d): widths.add(mod.in_channels); widths.add(mod.out_channels)
+    print(f'base={base}: params {p/1e6:.2f}M, FLOPs {tot/1e9:.1f}G, conv share {conv/tot*100:.1f}%, widths {min(widths)}-{max(widths)}')
+    del m; torch.cuda.empty_cache()
+PYEOF
+" 2>&1 | tail -6
+# date
+2026-09-19 07:10:07 UTC
+# output
+base=30: params 29.70M, FLOPs 422.1G, conv share 99.6%, widths 1-640
+The following submodules of the model were never called during the trace of the graph. They may be unused, or they were accessed by direct calls to .forward() or via other python methods. In the latter case they will have zeros for statistics, though their statistics will still contribute to their parent calling module.
+seg_outputs.0, seg_outputs.1, seg_outputs.2, seg_outputs.3
+The following submodules of the model were never called during the trace of the graph. They may be unused, or they were accessed by direct calls to .forward() or via other python methods. In the latter case they will have zeros for statistics, though their statistics will still contribute to their parent calling module.
+seg_outputs.0, seg_outputs.1, seg_outputs.2, seg_outputs.3
+base=32: params 31.20M, FLOPs 479.1G, conv share 99.6%, widths 1-640

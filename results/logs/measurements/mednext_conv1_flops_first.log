@@ -1,0 +1,48 @@
+# command
+ssh -o StrictHostKeyChecking=no <host> "
+source /venv/main/bin/activate
+python3 << 'EOF'
+import torch
+from fvcore.nn import FlopCountAnalysis
+from nnunet_mednext.network_architecture.mednextv1.create_mednext_v1 import create_mednext_v1
+
+model = create_mednext_v1(num_input_channels=1, num_classes=2, model_id='B', kernel_size=3).cuda()
+x = torch.zeros((1, 1, 128, 128, 128), device='cuda')
+flops = FlopCountAnalysis(model, x)
+flops.unsupported_ops_warnings(False)
+total_flops = flops.total()
+print(f'Total FLOPs: {total_flops:.3e} ({total_flops/1e9:.1f} GFLOPs)')
+
+by_mod = flops.by_module()
+conv1_flops = 0
+for name, count in by_mod.items():
+    if name.endswith('.conv1') or name == 'conv1':
+        conv1_flops += count
+
+pct = (conv1_flops / total_flops) * 100 if total_flops > 0 else 0
+print(f'conv1 total FLOPs: {conv1_flops:.3e} ({pct:.1f}% of total)')
+
+# also show top-level breakdown for sanity
+print('--- top modules by flops ---')
+for name, count in sorted(by_mod.items(), key=lambda x: -x[1])[:10]:
+    if count > 0:
+        print(f'{(count/total_flops)*100:5.1f}%  {name}')
+EOF
+" 2>&1 | tail -25
+# date
+2026-09-19 01:17:37 UTC
+# output
+Activated conda/uv virtual environment at /venv/main
+Total FLOPs: 1.694e+11 (169.4 GFLOPs)
+conv1 total FLOPs: 1.054e+10 (6.2% of total)
+--- top modules by flops ---
+100.0%  
+ 15.8%  up_0
+ 12.7%  enc_block_0
+ 12.7%  dec_block_0
+ 11.2%  up_1
+  9.9%  up_0.conv2
+  8.2%  enc_block_1
+  8.2%  dec_block_1
+  7.3%  up_1.conv2
+  7.0%  up_2

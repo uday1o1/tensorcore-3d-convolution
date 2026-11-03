@@ -1,7 +1,7 @@
 {
  "summaries": [
-  "/workspace/RESULTS_FOLDER/nnUNet/3d_fullres/Task003_Liver/nnUNetTrainerV2_MedNeXt_B_k3_150ep_s1__nnUNetPlansv2.1_trgSp_1x1x1/fold_0/validation_raw/summary.json",
-  "/workspace/RESULTS_FOLDER/nnUNet/3d_fullres/Task003_Liver/nnUNetTrainerV2_MedNeXt_B_k3_150ep_s2__nnUNetPlansv2.1_trgSp_1x1x1/fold_0/validation_raw/summary.json"
+  "nnUNetTrainerV2_MedNeXt_B_k3_150ep_s1__nnUNetPlansv2.1_trgSp_1x1x1",
+  "nnUNetTrainerV2_MedNeXt_B_k3_150ep_s2__nnUNetPlansv2.1_trgSp_1x1x1"
  ],
  "classes": {
   "1": {

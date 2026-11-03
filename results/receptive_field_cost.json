@@ -12,7 +12,6 @@
   "infer_ms": 48.343634605407715,
   "train_ms": 120.02456188201904,
   "train_gb": 2.549429248,
-  "receptive_field_voxels": 31,
   "layers_retuned": 0,
   "gpu": "NVIDIA GeForce RTX 3090"
  },
@@ -29,7 +28,6 @@
   "infer_ms": 50.13232231140137,
   "train_ms": 129.81798648834229,
   "train_gb": 2.55116032,
-  "receptive_field_voxels": 55,
   "layers_retuned": 12,
   "gpu": "NVIDIA GeForce RTX 3090"
  },
@@ -46,7 +44,6 @@
   "infer_ms": 59.21885967254639,
   "train_ms": 157.85608291625977,
   "train_gb": 2.554363392,
-  "receptive_field_voxels": 75,
   "layers_retuned": 17,
   "gpu": "NVIDIA GeForce RTX 3090"
  },
@@ -63,7 +60,6 @@
   "infer_ms": 68.99256706237793,
   "train_ms": 239.93873596191406,
   "train_gb": 2.55144448,
-  "receptive_field_voxels": 61,
   "layers_retuned": 22,
   "gpu": "NVIDIA GeForce RTX 3090"
  }

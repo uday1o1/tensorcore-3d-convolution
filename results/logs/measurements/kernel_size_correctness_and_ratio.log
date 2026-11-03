@@ -1,0 +1,62 @@
+# command
+ssh -o StrictHostKeyChecking=no -o ConnectTimeout=25 <host> "
+cd /workspace/win3d && source /venv/main/bin/activate
+python3 << 'PYEOF'
+import torch, torch.nn.functional as F, time, math
+from winconv import im2win_conv3d_minmat
+torch.backends.cudnn.benchmark=True
+def t(fn,n=15):
+    for _ in range(6): fn()
+    torch.cuda.synchronize(); t0=time.time()
+    for _ in range(n): fn()
+    torch.cuda.synchronize(); return (time.time()-t0)/n
+
+# correctness at each k first
+torch.backends.cuda.matmul.allow_tf32=False; torch.backends.cudnn.allow_tf32=False
+print('correctness by kernel size:')
+for k in [3,5,7]:
+    x=torch.randn(2,16,20,20,20,device='cuda'); w=torch.randn(32,16,k,k,k,device='cuda')
+    ref=F.conv3d(x,w); got=im2win_conv3d_minmat(x,w)
+    rel=(ref-got).abs().max().item()/ref.abs().max().item()
+    print(f'  k={k}: rel_err {rel:.2e} {\"OK\" if rel<1e-5 else \"FAIL\"}')
+torch.backends.cudnn.allow_tf32=True
+print()
+print('PREDICTION: minimal materialization grows as k, reduction depth as k^3,')
+print('so intensity rises with k and windowed should improve with larger kernels.')
+print()
+print(f'{\"layer\":>14} {\"k\":>2} {\"cuDNN\":>8} {\"windowed\":>9} {\"ratio\":>7} {\"intensity\":>10}')
+for (cin,cout,sp) in [(60,60,64),(120,120,32),(240,240,16)]:
+    for k in [3,5,7]:
+        B=2
+        if sp-k+1 < 2: continue
+        x=torch.randn(B,cin,sp,sp,sp,device='cuda',dtype=torch.half)
+        w=torch.randn(cout,cin,k,k,k,device='cuda',dtype=torch.half)
+        o=sp-k+1; ops=2*B*cout*o*o*o*cin*k*k*k
+        tc=t(lambda:F.conv3d(x,w)); tw=t(lambda:im2win_conv3d_minmat(x,w))
+        inten=ops/(B*cin*sp*sp*sp*2)
+        print(f'{cin:5d}->{cout:<5d}{sp:3d} {k:2d} {ops/tc/1e12:8.2f} {ops/tw/1e12:9.2f} {tc/tw:6.2f}x {inten:10.0f}')
+        del x,w; torch.cuda.empty_cache()
+PYEOF
+" 2>&1 | tail -20
+# date
+2026-09-19 08:32:24 UTC
+# output
+Activated conda/uv virtual environment at /venv/main
+correctness by kernel size:
+  k=3: rel_err 0.00e+00 OK
+  k=5: rel_err 2.00e-06 OK
+  k=7: rel_err 3.15e-07 OK
+
+PREDICTION: minimal materialization grows as k, reduction depth as k^3,
+so intensity rises with k and windowed should improve with larger kernels.
+
+         layer  k    cuDNN  windowed   ratio  intensity
+   60->60    64  3    34.68     15.49   0.45x       1473
+   60->60    64  5    29.55     29.01   0.98x       6180
+   60->60    64  7    29.85     33.69   1.13x      15318
+  120->120   32  3    43.37     16.21   0.37x       2670
+  120->120   32  5    32.96     32.18   0.98x      10049
+  120->120   32  7    44.46     34.75   0.78x      22077
+  240->240   16  3    52.28     43.98   0.84x       4341
+  240->240   16  5    28.34     44.81   1.58x      12656
+  240->240   16  7    33.48     31.73   0.95x      20098

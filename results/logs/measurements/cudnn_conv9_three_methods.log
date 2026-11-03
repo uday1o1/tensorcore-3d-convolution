@@ -1,0 +1,44 @@
+# command
+ssh -o StrictHostKeyChecking=no -o ConnectTimeout=30 <host> "
+source /venv/main/bin/activate
+python3 << 'PYEOF'
+import torch, torch.nn.functional as F, time
+torch.backends.cudnn.benchmark=True
+B,C,H,W,Co,k,s=256,64,56,56,64,3,1
+x=torch.randn(B,C,H,W,device='cuda',dtype=torch.half)
+w=torch.randn(Co,C,k,k,device='cuda',dtype=torch.half)
+oh=(H-k)//s+1; ops=2*B*Co*oh*oh*C*k*k
+for _ in range(50): F.conv2d(x,w,stride=s)
+torch.cuda.synchronize()
+
+# A: host wall-clock + sync per iteration  (EXACTLY their methodology)
+ts=[]
+for _ in range(30):
+    t0=time.perf_counter(); F.conv2d(x,w,stride=s); torch.cuda.synchronize(); ts.append(time.perf_counter()-t0)
+print(f'A host-clock + sync/iter (their method): best {ops/min(ts)/1e12:5.2f} mean {ops/(sum(ts)/len(ts))/1e12:5.2f} TFLOPS  ({min(ts)*1000:.3f} ms best)')
+
+# B: cuda events per iteration
+ts=[]
+for _ in range(30):
+    a=torch.cuda.Event(enable_timing=True); b=torch.cuda.Event(enable_timing=True)
+    a.record(); F.conv2d(x,w,stride=s); b.record(); torch.cuda.synchronize(); ts.append(a.elapsed_time(b)/1000)
+print(f'B cuda-events per iter              : best {ops/min(ts)/1e12:5.2f} mean {ops/(sum(ts)/len(ts))/1e12:5.2f} TFLOPS  ({min(ts)*1000:.3f} ms best)')
+
+# C: back-to-back N, one sync
+N=30; torch.cuda.synchronize(); t0=time.perf_counter()
+for _ in range(N): F.conv2d(x,w,stride=s)
+torch.cuda.synchronize(); dt=(time.perf_counter()-t0)/N
+print(f'C back-to-back, one sync            : {ops/dt/1e12:5.2f} TFLOPS  ({dt*1000:.3f} ms)')
+print()
+print('im2win (their harness, their method): best 37.04  mean 36.42 TFLOPS')
+PYEOF
+" 2>&1 | tail -8
+# date
+2026-09-19 07:57:26 UTC
+# output
+Activated conda/uv virtual environment at /venv/main
+A host-clock + sync/iter (their method): best 22.96 mean 22.87 TFLOPS  (2.397 ms best)
+B cuda-events per iter              : best 23.78 mean 23.25 TFLOPS  (2.314 ms best)
+C back-to-back, one sync            : 23.24 TFLOPS  (2.369 ms)
+
+im2win (their harness, their method): best 37.04  mean 36.42 TFLOPS

@@ -1,7 +1,9 @@
-# Builds sweep_convs.cpp, the parameterized harness used to measure the
-# published Im2win Tensor Core kernel at shapes other than its own benchmark
-# layers. This is what produced the 37.0 TFLOPS kernel-only figure and the
-# generality audit in Section 4.
+# Builds sweep_convs.cpp, a parameterized harness that runs the published
+# Im2win Tensor Core kernel at shapes other than its own benchmark layers and
+# prints a nonzero-output count, so a launch that computes nothing is visible.
+# It times thirty iterations and reports the best and mean; its conv9 run
+# gives the kernel-only constant in bench_reproduce_im2win.py
+# (results/logs/measurements/im2win_conv9_best_mean_30it.log).
 #
 # It links against the Im2win source tree, which is not vendored here. Place
 # this file and sweep_convs.cpp in a build directory inside a clone of
@@ -16,7 +18,9 @@
 #   ./sweep B Cin H W Cout K stride
 #
 # CMAKE_CUDA_ARCHITECTURES is 86 for the RTX 3090 these measurements used.
-# Change it to match your device or the kernel will not launch.
+# Set it to your device's compute capability (for example 89 for an RTX 4090)
+# so nvcc builds native code for it; the build does not run on devices older
+# than compute capability 8.6.
 cmake_minimum_required(VERSION 3.10)
 project(sweep LANGUAGES CUDA CXX)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../src/common)

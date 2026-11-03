@@ -1,19 +1,24 @@
-# Core dependencies. Everything in bench/ except the dataset-dependent scripts
-# runs with just these plus a CUDA GPU.
+# Core dependencies. The Python benchmarks in bench/ that do not build MedNeXt
+# or nnU-Net networks run with just these plus a CUDA GPU. bench/sweep_convs.cpp
+# also needs a clone of the Im2win sources (see bench/CMakeLists.txt).
 #
-# Install torch matching your CUDA version. The measurements in this repository
-# were taken with the cu128 build:
+# Install torch matching your CUDA version. The host records in this
+# repository (results/validation/training_host_*.txt, results/host2/host.txt)
+# show torch 2.11.0+cu128 with cuDNN 9.19:
 #   pip install torch==2.11.0 --index-url https://download.pytorch.org/whl/cu128
 #
 torch==2.11.0
 numpy==2.5.3
 
-# Needed ONLY by the two benchmarks that use the real segmentation architecture
-# (bench_end_to_end.py, bench_dispatch_network.py) and by the accuracy check
-# (bench_dice_identical_weights.py). Install from source, since MedNeXt is a
-# fork of nnU-Net v1 and is not on PyPI:
+# MedNeXt (package nnunet_mednext) is imported by bench/bench_end_to_end.py,
+# bench/bench_dispatch_network.py, bench/bench_receptive_field.py,
+# bench/bench_effective_receptive_field.py, bench/bench_dice_identical_weights.py,
+# src/kernel_placement.py (upkern_from_checkpoint only) and the trainers in
+# src/trainers/. Install from source at the commit scripts/setup_vast.sh pins,
+# since MedNeXt is a fork of nnU-Net v1 and is not on PyPI:
 #
 #   git clone https://github.com/MIC-DKFZ/MedNeXt.git
+#   git -C MedNeXt checkout 0b78ed869fbd1cc2fd38754d2f8519f1b72d43ba
 #   cd MedNeXt && pip install -e .
 #
 # Note: that fork ships a stale module reference. If you run its preprocessing,

@@ -1,0 +1,47 @@
+# command
+ssh -o StrictHostKeyChecking=no -o ConnectTimeout=30 <host> "
+cd /workspace/win3d && source /venv/main/bin/activate
+python3 << 'PYEOF'
+import torch, torch.nn.functional as F
+from winconv import im2win_conv2d, im2win_conv3d
+torch.backends.cuda.matmul.allow_tf32 = False
+torch.backends.cudnn.allow_tf32 = False
+torch.manual_seed(0); ok=True
+print('TF32 DISABLED (true fp32 both paths)')
+print('=== 2D ===')
+for (B,C,H,W,Co,k,s) in [(4,16,32,32,32,3,1),(1,64,56,56,64,3,1),(2,8,16,16,4,5,1),
+                         (2,30,24,24,60,3,1),(1,120,32,32,240,3,1)]:
+    x=torch.randn(B,C,H,W,device='cuda'); w=torch.randn(Co,C,k,k,device='cuda')
+    ref=F.conv2d(x,w,stride=s); got=im2win_conv2d(x,w,stride=s)
+    rel=(ref-got).abs().max().item()/ref.abs().max().item()
+    f='OK' if rel<1e-5 else 'FAIL'; ok &= (rel<1e-5)
+    print(f'  {f} B{B} C{C} {H}x{W} Co{Co} k{k}: rel_err {rel:.2e}')
+print('=== 3D ===')
+for (B,C,D,H,W,Co,k,s) in [(2,4,8,8,8,3,3,1),(2,30,16,16,16,60,3,1),(1,120,16,16,16,240,3,1),
+                           (2,240,8,8,8,320,3,1)]:
+    x=torch.randn(B,C,D,H,W,device='cuda'); w=torch.randn(Co,C,k,k,k,device='cuda')
+    ref=F.conv3d(x,w,stride=s); got=im2win_conv3d(x,w,stride=s)
+    rel=(ref-got).abs().max().item()/ref.abs().max().item()
+    f='OK' if rel<1e-5 else 'FAIL'; ok &= (rel<1e-5)
+    print(f'  {f} B{B} C{C} {D}x{H}x{W} Co{Co} k{k}: rel_err {rel:.2e}')
+print()
+print('ALL CORRECT (TF32 off)' if ok else 'GENUINE ALGORITHMIC ERROR')
+PYEOF
+" 2>&1 | tail -14
+# date
+2026-09-19 07:55:05 UTC
+# output
+TF32 DISABLED (true fp32 both paths)
+=== 2D ===
+  OK B4 C16 32x32 Co32 k3: rel_err 0.00e+00
+  OK B1 C64 56x56 Co64 k3: rel_err 1.00e-06
+  OK B2 C8 16x16 Co4 k5: rel_err 5.19e-07
+  OK B2 C30 24x24 Co60 k3: rel_err 6.56e-07
+  OK B1 C120 32x32 Co240 k3: rel_err 1.23e-06
+=== 3D ===
+  OK B2 C4 8x8x8 Co3 k3: rel_err 0.00e+00
+  OK B2 C30 16x16x16 Co60 k3: rel_err 0.00e+00
+  OK B1 C120 16x16x16 Co240 k3: rel_err 2.42e-06
+  OK B2 C240 8x8x8 Co320 k3: rel_err 0.00e+00
+
+ALL CORRECT (TF32 off)

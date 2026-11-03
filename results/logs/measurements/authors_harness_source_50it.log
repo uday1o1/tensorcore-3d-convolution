@@ -1,0 +1,64 @@
+# command
+ssh -o StrictHostKeyChecking=no -o ConnectTimeout=30 <host> "
+sed -n '150,207p' /workspace/im2win/tensor_core_tflops/tflops_convs.cpp
+" 2>&1 | tail -60
+# date
+2026-09-19 05:21:01 UTC
+# output
+    int number = 50;
+    // 用于存储数据
+    ofstream ofs;             // 打开一个写的文件流
+    ofs.open(path, ios::app); // 把这个流和文件关联起来
+
+    size_t operations = input.batch * filter.batch * ((input.height - filter.height) / stride + 1) * ((input.width - filter.width) / stride + 1) * filter.channel * filter.height * filter.width * 2;
+
+    double elapsed = 0;
+    double gflops = 0;
+    double all = 0;
+    double all_gflops = 0;
+    double elapsed1 = 0;
+    double elapsed2 = 0;
+    double max = 0;
+
+    HTensor1D input_d(input.batch, input.channel, input.height, input.width);
+    HTensor1D filter_d(filter.batch, filter.channel, filter.height, filter.width);
+    HTensor1D output_d(input.batch, filter.batch, ((input.height - filter.height) / stride + 1), ((input.width - filter.width) / stride + 1));
+    // FTensor1D output_z(input.batch, filter.batch, ((input.height - filter.height) / stride + 1), ((input.width - filter.width) / stride + 1));
+    HTensor1D input_win(0, 0, 0, 0);
+    HTensor1D filter_win(0, 0, 0, 0);
+    output_d.setZero();
+    input_d.randomAssign();
+    filter_d.randomAssign();
+    //  对应conv4-5-6-8-9-10-11-12
+    image2window_pd_o1_h(input_win, input_d, filter_d, stride, 8, input_d.channel);
+    filter2window_pd_o1_h(filter_win, filter_d, 8, filter_d.channel);
+    // conv1-2 3 7
+    // image2window_pd_o2_h(input_win, input_d, filter_d, stride, 32, input_d.channel);
+    // filter2window_pd_o1_h(filter_win, filter_d, 32, filter_d.channel);
+
+    cout << "batch: " << output_d.batch << endl;
+    for (int i = 0; i < number; ++i)
+    {
+        elapsed1 = 0;
+        elapsed2 = 0;
+        output_d.setZero();
+
+        conv_withTimer1(output_d, input_d, filter_d, input_win, filter_win, stride, T, elapsed1, elapsed2);
+
+        // cout << output_d.compareTensor(output_z) << endl;
+
+        elapsed = elapsed2;
+        ofs << elapsed1 << endl;
+        ofs << elapsed << endl;
+        gflops = (operations / elapsed) / GIGA;
+        ofs << gflops << endl;
+        max = gflops > max ? gflops : max;
+    }
+    ofs << "max:" << endl;
+    ofs << max << endl;
+    // ofs << average_gflops << endl;
+    cout << max << endl;
+    ofs.close();
+
+    return 0;
+}

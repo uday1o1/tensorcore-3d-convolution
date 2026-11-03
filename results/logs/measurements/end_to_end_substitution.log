@@ -1,0 +1,62 @@
+# command
+ssh -o StrictHostKeyChecking=no -o ConnectTimeout=25 <host> "
+cd /workspace/win3d && source /venv/main/bin/activate
+python3 << 'PYEOF'
+import torch, torch.nn as nn, time, copy
+from nnunet_mednext.network_architecture.generic_UNet import Generic_UNet
+from winconv import WindowedConv3d
+torch.backends.cudnn.benchmark=True
+
+def build():
+    return Generic_UNet(1,30,3,5,2,2, nn.Conv3d, nn.InstanceNorm3d, {'eps':1e-5,'affine':True},
+        nn.Dropout3d, {'p':0,'inplace':True}, nn.LeakyReLU, {'negative_slope':1e-2,'inplace':True},
+        False, False, lambda x:x, None, [[2,2,2]]*5, [[3,3,3]]*6, False, True, True).cuda().eval()
+
+def swap(m):
+    tot=0; win=0
+    for name, mod in m.named_modules():
+        for cname, child in list(mod.named_children()):
+            if isinstance(child, nn.Conv3d):
+                new = WindowedConv3d(child.in_channels, child.out_channels,
+                    child.kernel_size, child.stride, child.padding,
+                    child.dilation, child.groups, child.bias is not None).cuda()
+                new.weight.data=child.weight.data.clone()
+                if child.bias is not None: new.bias.data=child.bias.data.clone()
+                setattr(mod,cname,new); tot+=1; win += 1 if new.use_windowed else 0
+    return tot,win
+
+torch.manual_seed(0)
+ref=build(); win=copy.deepcopy(ref); tot,nw=swap(win)
+print(f'substituted {tot} Conv3d layers, {nw} actually use the windowed path, {tot-nw} fall back')
+
+x=torch.randn(1,1,128,128,128,device='cuda')
+torch.backends.cuda.matmul.allow_tf32=False; torch.backends.cudnn.allow_tf32=False
+with torch.no_grad(): a=ref(x); b=win(x)
+rel=(a-b).abs().max().item()/a.abs().max().item()
+print(f'full-network match on identical weights: rel_err {rel:.2e}  {\"OK\" if rel<1e-4 else \"MISMATCH\"}')
+
+torch.backends.cudnn.allow_tf32=True
+def inf(m):
+    with torch.no_grad(), torch.autocast('cuda',dtype=torch.float16): m(x)
+res={}
+for m,label in [(ref,'cuDNN   '),(win,'windowed')]:
+    for _ in range(5): inf(m)
+    torch.cuda.synchronize(); torch.cuda.reset_peak_memory_stats(); t0=time.time()
+    for _ in range(15): inf(m)
+    torch.cuda.synchronize(); dt=(time.time()-t0)/15
+    res[label.strip()]=dt
+    print(f'{label}: {dt*1000:7.1f} ms/patch   peak {torch.cuda.max_memory_allocated()/1e9:5.2f} GB')
+print()
+print(f'END-TO-END ratio (cuDNN/windowed): {res[\"cuDNN\"]/res[\"windowed\"]:.3f}x')
+PYEOF
+" 2>&1 | tail -8
+# date
+2026-09-19 08:29:51 UTC
+# output
+Activated conda/uv virtual environment at /venv/main
+substituted 27 Conv3d layers, 22 actually use the windowed path, 5 fall back
+full-network match on identical weights: rel_err 1.18e-06  OK
+cuDNN   :    53.4 ms/patch   peak  1.31 GB
+windowed:   125.0 ms/patch   peak  5.07 GB
+
+END-TO-END ratio (cuDNN/windowed): 0.427x

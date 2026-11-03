@@ -9,11 +9,9 @@ files and the pull refuses to overwrite them. Setting BENCH_RESULTS_DIR sends
 output outside the checkout, and the files are copied back deliberately.
 
 Machine record. Timing results are only interpretable alongside the machine
-that produced them, and hosts differ more than GPUs do. Comparing two sessions
-of identical convolutions on one RTX 3090 host showed winners changing between
-sessions, and our two-device comparison could not separate the GPU from the
-host because neither the driver, the power limit, the clocks nor the host CPU
-was recorded. Every timing row now carries them.
+that produced them, and the host matters as well as the GPU. device_meta()
+returns the GPU, driver, power limit, clocks, host CPU and library versions,
+and the benchmarks that call it attach that record to every row they write.
 
 torch is imported lazily so results_dir() works on a machine without it.
 """
@@ -66,8 +64,9 @@ def device_meta():
     """Everything needed to interpret a timing later, including the host.
 
     A power limit below the card's default, or a different driver, can move a
-    ratio as much as a change of GPU generation, so both are recorded rather
-    than assumed. Values nvidia-smi cannot report are left out, not guessed.
+    ratio, so both are recorded rather than assumed. If nvidia-smi is
+    unavailable these fields are left out; a field it cannot report keeps its
+    own placeholder. Nothing is guessed.
     """
     import torch
     p = torch.cuda.get_device_properties(0)
@@ -93,9 +92,8 @@ def device_meta():
 def timed_pair(ref, win, timeit, trial):
     """Time both paths, alternating which goes first on successive trials.
 
-    Every comparison in this project originally timed the baseline first and
-    never reversed, so any position effect landed on one side of every ratio.
-    Alternating the order cancels a position effect in the median and, because
+    Timing the baseline first on every trial would put any position effect on
+    one side of every ratio. Alternating the order cancels a position effect in the median and, because
     the order is recorded, also lets it be measured instead of assumed absent.
 
     Returns (t_ref, t_win, ref_first).

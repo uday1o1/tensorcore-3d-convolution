@@ -1,8 +1,11 @@
 """Base trainer for the kernel-placement study.
 
-Subclasses set KERNELS, one entry per encoder stage. The network is built at
-kernel 3, the depthwise convolutions are reassigned per stage, and the weights
-are initialized from a trained kernel-3 checkpoint by UpKern.
+Subclasses set KERNELS, one entry per resolution level. Each entry sets the
+depthwise kernel of every block at that width (encoder blocks, the downsampling
+convolution and decoder blocks), and the last entry also covers the bottleneck.
+The network is built at kernel 3, the depthwise convolutions are reassigned per
+level, and unless a subclass sets UPKERN = False the weights are initialized
+from a trained kernel-3 checkpoint by UpKern.
 
 Why UpKern rather than training from scratch: MedNeXt's paper reports that
 large kernel MedNeXts trained from scratch fail to perform, scoring 84.03 on
@@ -12,8 +15,9 @@ would risk measuring an optimization failure and reporting it as evidence that
 receptive field does not help, which is the wrong conclusion from the right
 number.
 
-The UpKern source is the kernel-3 run from the variance pilot, which is also
-this study's baseline, so no training is spent solely on initialization.
+The UpKern source is the final checkpoint of the study's kernel-3 baseline run
+(trainer nnUNetTrainerV2_MedNeXt_B_k3_150ep_s1), so no training is spent solely
+on initialization.
 
 Set MEDNEXT_UPKERN_SOURCE to the source checkpoint. The trainer refuses to run
 without it rather than silently falling back to random initialization, since
@@ -34,7 +38,7 @@ from nnunet_mednext.run.load_weights import upkern_load_weights
 
 
 class MedNeXtPlacementTrainer(nnUNetTrainerV2_MedNeXt_B_kernel3):
-    """MedNeXt-B with per-stage depthwise kernels, UpKern initialized."""
+    """MedNeXt-B with per-level depthwise kernels, UpKern initialized by default."""
 
     KERNELS = [3, 3, 3, 3]
     # UpKern is the default because MedNeXt reports large kernels failing from

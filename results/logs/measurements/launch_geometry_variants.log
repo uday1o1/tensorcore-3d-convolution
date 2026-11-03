@@ -1,0 +1,18 @@
+# command
+ssh -o StrictHostKeyChecking=no -o ConnectTimeout=30 <host> "
+for f in im2win_async_128x64_4_base_conv9 im2win_async_128x64_4_base_conv10 im2win_async_128x64_8_base_conv11 im2win_async_128x64_1_base_conv4 im2win_async_128x64_4_base_conv8; do
+  printf '%-40s ' \$f
+  grep -A2 'dim3 gridSize' /workspace/im2win/src/tensorCore/\$f.cu 2>/dev/null | tr -d '\n' | sed 's/  */ /g' | cut -c1-105
+  echo
+done
+" 2>&1 | tail -8
+# date
+2026-09-19 07:03:15 UTC
+# output
+im2win_async_128x64_4_base_conv10         // const dim3 gridSize(CEIL_DIV(M, TLIE_M_PER_BLOCK), 18, // 2 // 54 * 6); // const dim3 gridSize(CEIL_D
+
+im2win_async_128x64_8_base_conv11         const dim3 gridSize(CEIL_DIV(M, TLIE_M_PER_BLOCK), 12, // conv5 24); // 400
+
+im2win_async_128x64_1_base_conv4          const dim3 gridSize(CEIL_DIV(M, TLIE_M_PER_BLOCK), 109, // 2 109 * 2); // const dim3 gridSize(CEIL_DIV(M
+
+im2win_async_128x64_4_base_conv8          // const dim3 gridSize(CEIL_DIV(M, TLIE_M_PER_BLOCK), 18, // 2 // 54 * 6); // const dim3 gridSize(CEIL_D

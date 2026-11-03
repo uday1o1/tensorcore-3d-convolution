@@ -1,0 +1,50 @@
+# command
+ssh -o StrictHostKeyChecking=no -o ConnectTimeout=25 <host> "
+echo -n 'training procs: '; pgrep -f mednextv1_train | wc -l
+nvidia-smi --query-gpu=utilization.gpu,memory.used --format=csv,noheader
+cat > /workspace/win3d/fftconv.py << 'PYEOF'
+import torch, torch.nn.functional as F
+
+def fft_conv3d(x, w, stride=1):
+    '''FFT-based 3D convolution, valid padding, stride 1 only.
+    Cost is O(n log n) in the volume and INDEPENDENT of kernel size,
+    which is the property that should make it win at large k.'''
+    assert stride == 1, 'FFT path implemented for stride 1'
+    B, C, D, H, W = x.shape
+    Co, _, kd, kh, kw = w.shape
+    # linear (not circular) convolution needs padding to at least N+K-1
+    sd, sh, sw = D + kd - 1, H + kh - 1, W + kw - 1
+    Xf = torch.fft.rfftn(x.float(), s=(sd, sh, sw), dim=(2,3,4))          # (B,C,.,.,.)
+    # correlation, not convolution: flip the kernel
+    wf = torch.flip(w.float(), dims=(2,3,4))
+    Wf = torch.fft.rfftn(wf, s=(sd, sh, sw), dim=(2,3,4))                 # (Co,C,.,.,.)
+    # sum over input channels: (B,1,C,...) * (1,Co,C,...) -> (B,Co,...)
+    out = torch.einsum('bcxyz,ocxyz->boxyz', Xf, Wf)
+    y = torch.fft.irfftn(out, s=(sd, sh, sw), dim=(2,3,4))
+    # valid region of a correlation starts at (k-1)
+    return y[:, :, kd-1:kd-1+D-kd+1, kh-1:kh-1+H-kh+1, kw-1:kw-1+W-kw+1].contiguous()
+PYEOF
+source /venv/main/bin/activate && cd /workspace/win3d
+python3 -c \"
+import torch, torch.nn.functional as F
+from fftconv import fft_conv3d
+torch.backends.cuda.matmul.allow_tf32=False; torch.backends.cudnn.allow_tf32=False
+print('FFT conv correctness:')
+for (B,C,D,Co,k) in [(1,4,12,3,3),(2,8,16,6,5),(1,6,14,4,7)]:
+    x=torch.randn(B,C,D,D,D,device='cuda'); w=torch.randn(Co,C,k,k,k,device='cuda')
+    ref=F.conv3d(x,w); got=fft_conv3d(x,w)
+    if ref.shape!=got.shape: print(f'  SHAPE C{C} k{k}: {ref.shape} vs {got.shape}'); continue
+    rel=(ref-got).abs().max().item()/ref.abs().max().item()
+    print(f'  {\\\"OK\\\" if rel<1e-4 else \\\"FAIL\\\"} C{C} D{D} k{k}: rel {rel:.2e}')
+\"
+" 2>&1 | tail -8
+# date
+2026-09-19 18:25:42 UTC
+# output
+training procs: 1
+0 %, 15 MiB
+Activated conda/uv virtual environment at /venv/main
+FFT conv correctness:
+  OK C4 D12 k3: rel 4.28e-07
+  OK C8 D16 k5: rel 1.14e-06
+  OK C6 D14 k7: rel 1.37e-06

@@ -2,20 +2,18 @@
 Maps where windowed convolution beats cuDNN, across channel width, spatial
 extent, and kernel size, in 3D.
 
-This produces the paper's central positive result: implicit GEMM scales with
-the k^3 growth in work while windowed materialization grows only linearly in
-k, so the curves cross at large kernel sizes.
+The mechanism under test: implicit GEMM scales with the k^3 growth in work
+while windowed materialization grows only linearly in k, so the curves cross
+at large kernel sizes.
 
 Reports the MEDIAN of repeated trials, and also the per-trial ratio spread.
-cuDNN shows real run-to-run variance in algorithm selection, and single
-measurements here are not trustworthy: three separate headline numbers in this
-project had to be corrected after repeated measurement contradicted a
-single-shot reading.
+cuDNN shows real run-to-run variance in algorithm selection, so single
+measurements here are not trustworthy.
 
-The spread is recorded because the paper states rules that hold "without
-exception" over this grid. A median above 1.0 does not establish that; a cell
-whose worst trial is also above 1.0 does. `ratio_min` is what those claims
-are checked against.
+The spread is recorded because a median above 1.0 does not show that a cell
+wins in every trial; a cell whose worst trial is also above 1.0 does.
+`ratio_min` and `ratio_max` are what the per-cell rules at the end are checked
+against.
 
 Usage:  python bench_crossover.py [trials]
 """
@@ -77,8 +75,9 @@ def sweep(mode, trials, rows, meta):
                         w = torch.randn(C, 1, k, k, k, device="cuda", dtype=torch.half)
                         ref = lambda: F.conv3d(x, w, groups=C)
                         win = lambda: im2win_conv3d_depthwise(x, w)
-                    # Order alternates by trial so a position effect cancels in
-                    # the median and is recorded rather than assumed absent.
+                    # Order alternates by trial so neither path always runs
+                    # first, and the per-order ratios are recorded so a position
+                    # effect is measured rather than assumed absent.
                     pairs = [timed_pair(ref, win, timeit, t) for t in range(trials)]
                     ratios = [a / b for a, b, _ in pairs]
                     tc = st.median([a for a, _, _ in pairs])
@@ -95,9 +94,10 @@ def sweep(mode, trials, rows, meta):
                           + (f"  order {oe:.2f}" if oe else ""), flush=True)
                     del x, w
                     torch.cuda.empty_cache()
-                except (torch.cuda.OutOfMemoryError, RuntimeError):
+                except (torch.cuda.OutOfMemoryError, RuntimeError) as e:
                     torch.cuda.empty_cache()
-                    print(f"{C:5d}{sp:5d}{k:4d}{out:5d}       oom", flush=True)
+                    print(f"{C:5d}{sp:5d}{k:4d}{out:5d}  skipped ({type(e).__name__})",
+                          flush=True)
 
 
 def main(trials=3):
@@ -126,8 +126,8 @@ def main(trials=3):
             print(f"  best: C={best['C']} sp={best['sp']} k={best['k']} "
                   f"-> {best['ratio']:.2f}x")
 
-    # The two rules the paper states as holding in every configuration
-    # measured, checked against the WORST trial in each cell, not the median.
+    # Two per-cell rules read off the grid, checked against the WORST trial in
+    # each cell rather than the median, so HOLDS means every trial agreed.
     dense = [r for r in rows if r["mode"] == "dense"]
     for label, sel in (("never wins at k=3", [r for r in dense if r["k"] == 3]),
                        ("always wins at C>=240, k>=5",

@@ -1,7 +1,7 @@
 """Does the crossover move when you train rather than infer?
 
-Every measurement in this project so far, and every measurement in the Im2win
-papers, is forward only. The cost that actually constrains large kernel 3D
+The crossover map, and every measurement in the Im2win papers, time the
+forward pass only. The cost that actually constrains large kernel 3D
 architectures is training cost, and there is a structural reason to expect the
 two to differ.
 
@@ -24,6 +24,11 @@ PREDICTION, recorded before measuring: the windowed method should do better
 relative to cuDNN in training than in inference, and the crossover should move
 to SMALLER kernel sizes. Configurations that lose on forward-only timing but
 sit close to parity should cross over once the backward pass is included.
+The printed verdict tests the first part: the geometric mean over all
+configurations of the cuDNN-to-windowed time ratio for a training step,
+against the same mean for forward only. Where the crossover sits is printed
+separately, as the median smallest winning kernel size per shape in each
+regime.
 
 This is falsifiable in the other direction too. The windowed path's backward
 also has to propagate gradients through the unfold, which is a scatter-add
@@ -117,9 +122,8 @@ def main(trials=5):
                     step_ref = step(lambda: F.conv3d(x, w))
                     step_win = step(lambda: im2win_conv3d_minmat(x, w))
 
-                    # Interleaved with alternating order. An earlier version
-                    # timed all cuDNN trials, then all windowed ones, so any
-                    # drift across the block landed entirely on one side.
+                    # Interleaved with alternating order, so drift across the
+                    # run does not land on one side.
                     fp = [timed_pair(fwd_ref, fwd_win, timeit, t) for t in range(trials)]
                     sp_ = [timed_pair(step_ref, step_win, timeit, t) for t in range(trials)]
                     f_ref = st.median([a for a, _, _ in fp])
@@ -183,15 +187,16 @@ def main(trials=5):
     print(f"  median shift: {st.median(shifts):+.3f}")
 
     verdict = "CONFIRMED" if geo_t > geo_f else "REFUTED"
-    print(f"\nprediction 'the crossover moves earlier in training': {verdict}")
+    print(f"\nprediction 'windowed does better relative to cuDNN in training' "
+          f"(geometric mean ratio, step against forward): {verdict}")
     mr = [r["mem_ratio"] for r in rows]
     print(f"  peak training memory, windowed over cuDNN: median {st.median(mr):.2f}x, "
           f"worst {max(mr):.2f}x")
     print("  (the buffer that is reused across both passes must also be retained "
           "across them)")
 
-    # Back out the backward pass alone. This is the quantity no published
-    # comparison in this family reports, since they all time forward kernels.
+    # Back out the backward pass alone. The Im2win evaluation times forward
+    # kernels only.
     #
     # Caveat stated in the output: the forward baseline here is measured under
     # no_grad, so subtracting it from the full step slightly overstates the

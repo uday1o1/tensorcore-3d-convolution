@@ -1,0 +1,45 @@
+# command
+ssh -o StrictHostKeyChecking=no -o ConnectTimeout=30 <host> "
+cd /workspace/win3d && cat >> winconv.py << 'PYEOF'
+
+def im2win_conv3d_minmat(x, w, stride=1):
+    '''3D windowed conv, minimal materialization: unfold D only (expansion k),
+    then slide H and W via conv2d. Closer in spirit to im2win 2D than the
+    double-unfold variant.'''
+    import torch.nn.functional as F
+    B, C, D, H, W = x.shape
+    Co = w.shape[0]; k = w.shape[2]
+    od = (D - k) // stride + 1
+    u = x.unfold(2, k, stride)                      # (B,C,od,H,W,kd)
+    u = u.permute(0, 2, 1, 5, 3, 4).contiguous()    # (B,od,C,kd,H,W)
+    u = u.reshape(B * od, C * k, H, W)
+    w2 = w.reshape(Co, C * k, k, k)                 # (Co, C*kd, kh, kw)
+    o = F.conv2d(u, w2, stride=stride)
+    oh, ow = o.shape[-2], o.shape[-1]
+    return o.reshape(B, od, Co, oh, ow).permute(0, 2, 1, 3, 4).contiguous()
+PYEOF
+source /venv/main/bin/activate
+python3 << 'PYEOF'
+import torch, torch.nn.functional as F, time
+from winconv import im2win_conv3d, im2win_conv3d_minmat
+torch.backends.cuda.matmul.allow_tf32=False; torch.backends.cudnn.allow_tf32=False
+print('=== correctness of minimal-materialization 3D ===')
+ok=True
+for (B,C,D,H,W,Co,k,s) in [(2,4,8,8,8,3,3,1),(2,30,16,16,16,60,3,1),(1,16,12,12,12,32,3,1),(2,8,10,10,10,4,3,2)]:
+    x=torch.randn(B,C,D,H,W,device='cuda'); w=torch.randn(Co,C,k,k,k,device='cuda')
+    ref=F.conv3d(x,w,stride=s); got=im2win_conv3d_minmat(x,w,stride=s)
+    rel=(ref-got).abs().max().item()/ref.abs().max().item(); ok &= rel<1e-5
+    print(f'  {\"OK\" if rel<1e-5 else \"FAIL\"} C{C} {D}x{H}x{W} Co{Co} k{k} s{s}: {rel:.2e}')
+print('CORRECT' if ok else 'FAILED')
+PYEOF
+" 2>&1 | tail -8
+# date
+2026-09-19 07:59:43 UTC
+# output
+Activated conda/uv virtual environment at /venv/main
+=== correctness of minimal-materialization 3D ===
+  OK C4 8x8x8 Co3 k3 s1: 0.00e+00
+  OK C30 16x16x16 Co60 k3 s1: 1.09e-06
+  OK C16 12x12x12 Co32 k3 s1: 7.54e-07
+  OK C8 10x10x10 Co4 k3 s2: 0.00e+00
+CORRECT

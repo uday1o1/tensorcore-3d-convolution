@@ -12,8 +12,8 @@ This measures the cost side of that question for MedNeXt, whose large kernel
 convolution is depthwise, using only standard PyTorch and cuDNN operations. The
 accuracy side needs training and is produced by the companion runs.
 
-COST PREDICTION, recorded before any accuracy measurement, derived from the
-depthwise crossover grid in results/:
+COST PREDICTION, recorded before any accuracy measurement, derived from
+cuDNN's depthwise times in results/crossover_map_rtx3090.json:
 
   Approximating a four level encoder as (30ch, 64), (60ch, 32), (120ch, 16),
   (240ch, 16), the measured depthwise cost of each placement relative to an
@@ -30,8 +30,9 @@ depthwise crossover grid in results/:
   We therefore predict that 3-3-5-5 lies on the accuracy-cost Pareto frontier
   and 5-5-5-5 does not. For uniform enlargement to be justified it would have
   to deliver roughly four times the Dice improvement of deep-stage-only
-  placement, and the large kernel literature reports gains of a few tenths of a
-  Dice point rather than multiples.
+  placement, and MedNeXt reports kernel 5 with UpKern gaining about 0.2 Dice
+  points over kernel 3 (MedNeXt-B: 84.01 to 84.23 on BTCV, 89.14 to 89.38 on
+  AMOS22), not multiples.
 
   The prediction fails if Dice turns out to depend on receptive field in the
   EARLY stages specifically, where the cost is concentrated. That is the
@@ -56,8 +57,8 @@ sys.path.insert(0, str(ROOT / "src"))
 from benchenv import results_dir, device_meta
 from kernel_placement import set_stage_kernels, receptive_field
 
-# The placements named in the review, plus the uniform-5 upper bound they
-# should be compared against.
+# The deep-stage placements under study, plus the uniform-5 upper bound they
+# are compared against.
 PLACEMENTS = {
     "3-3-3-3": [3, 3, 3, 3],
     "3-3-5-5": [3, 3, 5, 5],
@@ -72,9 +73,10 @@ def count_flops_params(model, x):
     """FLOPs for conv layers via shape bookkeeping, plus parameter count.
 
     Counted by hooks rather than estimated, so grouped and depthwise
-    convolutions are charged correctly: a depthwise layer reduces over one
+    convolutions are charged per group: a depthwise layer reduces over one
     input channel, not over all of them, and a FLOP model that misses this
-    overstates it by the channel count.
+    overstates it by the channel count. Transposed convolutions are charged at
+    output resolution, which overstates them by the upsampling factor.
     """
     flops = [0]
 

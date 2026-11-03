@@ -10,8 +10,9 @@
 #   scripts/setup_vast.sh status                 what has finished, what is running
 #   source "$WORK/env.sh"                        environment for running anything
 #
-# Every stage writes a marker when it completes, so rerunning after a dropped
-# connection resumes where it stopped. Logs and results go under $WORK, outside
+# Every long stage writes a marker when it completes, so rerunning after a
+# dropped connection resumes where it stopped; the cheap ones (trainer links,
+# smoke test) rerun each time. Logs and results go under $WORK, outside
 # the repository checkout, so `git pull` on the instance never collides with
 # freshly written files.
 #
@@ -26,6 +27,7 @@ MIN_FREE_GB="${MIN_FREE_GB:-100}"
 LOGDIR="$WORK/logs"
 MARK="$WORK/.setup"
 MEDNEXT_DIR="$WORK/MedNeXt"
+MEDNEXT_SHA="0b78ed869fbd1cc2fd38754d2f8519f1b72d43ba"
 TASK_TAR_URL="https://msd-for-monai.s3-us-west-2.amazonaws.com/Task03_Liver.tar"
 PLANS="nnUNetPlansv2.1_trgSp_1x1x1"
 mkdir -p "$LOGDIR" "$MARK"
@@ -38,9 +40,9 @@ export nnUNet_raw_data_base="$WORK/nnUNet_raw_data_base"
 export nnUNet_preprocessed="$WORK/nnUNet_preprocessed"
 export RESULTS_FOLDER="$WORK/RESULTS_FOLDER"
 export BENCH_RESULTS_DIR="$WORK/bench_results"
-# Evaluation loads full-resolution predictions and labels in parallel. With
-# nnU-Net's default of 8 workers it reached 64 GB on a 64 GB host and the run
-# was killed after all predictions were written, before any score was saved.
+# Evaluation loads full-resolution predictions and labels in parallel, and
+# nnU-Net's default of 8 workers can exhaust a 64 GB host before any score
+# is saved.
 export nnUNet_def_n_proc=2
 # nnU-Net loads its own checkpoints with a bare torch.load, which torch 2.6+
 # refuses for these files; this only applies where the caller left
@@ -53,7 +55,8 @@ EOF
 }
 
 say() { echo "$(date '+%F %T') $*"; }
-# venv activate scripts reference unset variables, which set -u turns fatal.
+# Activate scripts are not guaranteed to be safe under set -u, so it is lifted
+# while sourcing.
 load_env() { set +u; source "$WORK/env.sh"; set -u; }
 done_stage() { [ -f "$MARK/$1.done" ]; }
 finish_stage() { touch "$MARK/$1.done"; say "stage $1 complete"; }
@@ -66,9 +69,8 @@ need_space() {
   fi
 }
 
-# The archive host serves one connection at a few MB/s and a single stream
-# was seen to stall outright, so fetch byte ranges in parallel. Parts keep
-# what they have, so a rerun resumes.
+# A single stream from the archive host can be slow or stall, so fetch byte
+# ranges in parallel. Parts keep what they have, so a rerun resumes.
 download_parallel() {
   local url="$1" out="$2" n=16 size chunk i s e want part have pids=()
   size=$(curl -sIL "$url" | tr -d '\r' | awk 'tolower($1)=="content-length:" {v=$2} END {print v}')
@@ -112,16 +114,20 @@ stage_deps() {
   done_stage deps && return
   say "dependencies"
   load_env
-  [ -d "$MEDNEXT_DIR" ] || git clone -q https://github.com/MIC-DKFZ/MedNeXt.git "$MEDNEXT_DIR"
+  # The fork is pinned to one commit, so the patch below and the trainers'
+  # imports always apply to the same code.
+  [ -d "$MEDNEXT_DIR" ] || git clone -q https://github.com/MIC-DKFZ/MedNeXt.git "$MEDNEXT_DIR" || exit 1
+  git -C "$MEDNEXT_DIR" checkout -q "$MEDNEXT_SHA" || exit 1
   # The fork still names the pre-rename package when it locates preprocessors,
   # so planning fails until this is corrected.
   sed -i 's/current_module="nnunet.preprocessing"/current_module="nnunet_mednext.preprocessing"/' \
     "$MEDNEXT_DIR/nnunet_mednext/experiment_planning/experiment_planner_baseline_3DUNet.py"
-  # torch from the cu128 index at the version every committed result used.
-  # cuDNN's version decides which algorithms it can select, so letting the
-  # image's torch or default PyPI choose would change the measurement.
+  # torch from the cu128 index at the pinned version (2.11.0+cu128 with cuDNN
+  # 9.19, as recorded in results/validation/training_host_*.txt). cuDNN's
+  # version decides which algorithms it can select, so letting the image's
+  # torch or default PyPI choose would change the measurement.
   pip install -q "torch==2.11.0" --index-url https://download.pytorch.org/whl/cu128 || exit 1
-  pip install -q "numpy==2.5.3" surface-distance || exit 1
+  pip install -q "numpy==2.5.3" || exit 1
   pip install -q -e "$MEDNEXT_DIR" || exit 1
   python -c "import torch; print('torch', torch.__version__, 'cudnn', torch.backends.cudnn.version())" \
     | tee -a "$LOGDIR/host.txt"
@@ -129,8 +135,8 @@ stage_deps() {
 }
 
 stage_trainers() {
-  # Symlinked, not copied: the trainers locate their shared modules relative
-  # to their own resolved path, which a copy would break.
+  # Symlinked, not copied, so the installed trainers always match the checkout
+  # and resolve their shared modules from their real location in src/.
   say "installing trainers"
   local dst="$MEDNEXT_DIR/nnunet_mednext/training/network_training/MedNeXt"
   for f in "$REPO"/src/trainers/*.py; do ln -sf "$f" "$dst/$(basename "$f")"; done
@@ -160,8 +166,8 @@ stage_data() {
     finish_stage convert
   fi
   say "planning and preprocessing"
-  # -tf 3: the default of 8 full-resolution workers ran out of memory on the
-  # largest volumes and stalled without erroring.
+  # -tf 3 -tl 3: nnU-Net's default of 8 workers per resolution can exhaust
+  # host memory on the largest volumes.
   mednextv1_plan_and_preprocess -t 3 -pl3d ExperimentPlanner3D_v21_customTargetSpacing_1x1x1 \
     -pl2d None -tf 3 -tl 3 || exit 1
   rm -rf "$nnUNet_raw_data_base/nnUNet_cropped_data"
@@ -220,12 +226,12 @@ cmd_train() {
   [ -f "$out/validation_raw/summary.json" ] || \
     mednextv1_train 3d_fullres "$trainer" Task003_Liver 0 --use_compressed_data -p "$PLANS" "${resume[@]}"
   local rc=$?
-  # The per-case validation summary is small and is the raw input to every
-  # accuracy claim. Copy it out of the run directory immediately: when an
-  # earlier instance was destroyed, only derived numbers survived.
+  # The per-case validation summary is small and is the raw input to the
+  # training-study accuracy numbers. Copy it out of the run directory
+  # immediately, so it survives the instance being destroyed.
   if [ -f "$out/validation_raw/summary.json" ]; then
     cp "$out/validation_raw/summary.json" "$BENCH_RESULTS_DIR/validation/${trainer}_summary.json"
-    say "TRAINED $trainer, summary saved"
+    say "DONE $trainer, summary saved"
   else
     say "FAILED $trainer (exit $rc), no validation summary"
   fi

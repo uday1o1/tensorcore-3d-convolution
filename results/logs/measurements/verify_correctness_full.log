@@ -1,0 +1,41 @@
+# command
+ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=120 <host> 'source /venv/main/bin/activate && cd /opt/proj/tensorcore-3d-convolution/bench && python verify_correctness.py 2>&1 | tail -45' 2>&1 | tail -45
+# date
+2026-09-19 20:40:48 UTC
+# output
+Activated conda/uv virtual environment at /venv/main
+2D windowed convolution
+  OK   C8 16x16 Co4 k3 s1: rel_err 0.00e+00
+  OK   C3 9x9 Co5 k3 s1: rel_err 0.00e+00
+  OK   C16 32x32 Co32 k3 s1: rel_err 0.00e+00
+  OK   C30 24x24 Co60 k3 s1: rel_err 6.56e-07
+  OK   C8 16x16 Co4 k5 s1: rel_err 4.05e-07
+  OK   C8 17x19 Co4 k3 s2: rel_err 0.00e+00
+3D windowed convolution, k^2 materialization
+  OK   C4 8^3 Co3 k3 s1: rel_err 0.00e+00
+  OK   C30 16^3 Co60 k3 s1: rel_err 0.00e+00
+  OK   C8 10^3 Co4 k3 s2: rel_err 0.00e+00
+3D windowed convolution, minimal (k) materialization
+  OK   C4 8^3 Co3 k3 s1: rel_err 0.00e+00
+  OK   C30 16^3 Co60 k3 s1: rel_err 1.26e-06
+  OK   C16 20^3 Co32 k5 s1: rel_err 1.64e-06
+  OK   C6 20^3 Co4 k7 s1: rel_err 1.75e-06
+  OK   C8 10^3 Co4 k3 s2: rel_err 0.00e+00
+3D windowed convolution, depthwise
+  OK   C8 12^3 k3 s1 groups=8: rel_err 0.00e+00
+  OK   C32 16^3 k5 s1 groups=32: rel_err 0.00e+00
+  OK   C64 20^3 k7 s1 groups=64: rel_err 0.00e+00
+  OK   C16 17^3 k3 s2 groups=16: rel_err 0.00e+00
+FFT convolution
+  OK   C4 12^3 Co3 k3: rel_err 4.44e-07
+  OK   C8 16^3 Co6 k5: rel_err 1.18e-06
+  OK   C6 14^3 Co4 k7: rel_err 1.50e-06
+WindowedConv3d drop-in module vs nn.Conv3d (identical weights)
+  OK   conv3d(30,60,k=3,p=1,s=1,g=1) windowed=True: rel_err 1.23e-06
+  OK   conv3d(120,120,k=3,p=1,s=1,g=1) windowed=True: rel_err 0.00e+00
+  OK   conv3d(60,60,k=3,p=1,s=2,g=1) windowed=True: rel_err 0.00e+00
+  OK   conv3d(32,64,k=1,p=0,s=1,g=1) windowed=False: rel_err 0.00e+00
+  OK   conv3d(64,64,k=5,p=2,s=1,g=64) windowed=True: rel_err 0.00e+00
+  OK   conv3d(64,64,k=3,p=1,s=1,g=4) windowed=False: rel_err 0.00e+00
+
+ALL CORRECT

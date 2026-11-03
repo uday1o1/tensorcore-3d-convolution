@@ -6,9 +6,9 @@ is the noise floor of this training setup: any claim that one architecture beats
 another has to clear it.
 
 The threshold is not arbitrary. MedNeXt reports uniform kernel 5 with UpKern
-improving mean Dice by roughly 0.2 points over kernel 3 (84.03 to 84.23 on BTCV,
-86.71 to 87.06 on AMOS22). That is the size of the effect a placement study
-chases.
+improving mean Dice by roughly 0.2 points over kernel 3 (MedNeXt-B: 84.01 to
+84.23 on BTCV, 89.14 to 89.38 on AMOS22). That is the size of the effect a
+placement study chases.
 
 WHY EVERY PAIR, NOT JUST ONE. With two runs there is a single comparison, which
 can show that a false positive is possible but not how often it occurs, and an
@@ -18,15 +18,14 @@ rate.
 WHICH NUMBER TO COMPARE. nnU-Net logs an "Average global foreground Dice" every
 epoch, computed on training-time validation batches. It is extremely noisy: in
 one run consecutive epochs gave tumour Dice of 0.79, 0.63, 0.74, 0.79, 0.50,
-0.84. That is a training diagnostic, not a result, and an earlier version of
-this script compared it, which would have declared the study impossible on the
-strength of the wrong quantity. The result is the per-case Dice in
+0.84. That is a training diagnostic, not a result, and comparing it would
+declare the study impossible on the strength of the wrong quantity. The result
+is the per-case Dice in
 validation_raw/summary.json, written after training by full sliding window
 inference over every validation case.
 
-Per-case values also permit a paired signed-rank test over cases, which is the
-test this project's proposal specified, and which is the point: run against a
-known null, it should not find anything.
+Per-case values also permit a paired Wilcoxon signed-rank test over cases. Run
+against a known null, it should not find anything.
 
 Usage:
   python analyze_variance_pilot.py <summary1.json> <summary2.json> [more...]
@@ -80,7 +79,9 @@ def per_case(path):
 
 
 def wilcoxon_signed_rank(diffs):
-    """Two-sided Wilcoxon signed-rank p, normal approximation.
+    """Two-sided Wilcoxon signed-rank p, normal approximation without tie or
+    continuity correction (ties are ranked in order, harmless for continuous
+    Dice differences).
 
     Returns None when too few nonzero differences for the approximation to mean
     anything, rather than a number that would look like evidence.
@@ -105,10 +106,11 @@ def wilcoxon_signed_rank(diffs):
 def compare(run_a, run_b, cls):
     """Paired comparison on one class, dropping cases where it is absent.
 
-    A class Dice is NaN for cases that do not contain that class, and those
-    cases carry no information about it. Coercing them to zero would drag both
-    means down and shrink the apparent spread, making the noise floor look
-    smaller than it is.
+    A class Dice is NaN for cases where neither the reference nor the
+    prediction contains that class, and those cases carry no information about
+    it. Coercing them to zero would drag both means down and shrink the
+    apparent spread, making the noise floor look smaller than it is. Cases
+    where only the prediction contains the class score 0 and are kept.
     """
     shared = sorted(set(run_a) & set(run_b))
     usable = [k for k in shared
@@ -185,8 +187,13 @@ def main(argv):
               f"p < {ALPHA} between IDENTICAL configurations")
         if worst > 0:
             need = max(1, round((worst / TARGET_EFFECT) ** 2))
-            print(f"  runs per configuration needed to resolve the effect: ~{need}")
+            print(f"  runs per configuration for the spread to fall to the effect, "
+                  f"assuming it shrinks as 1/sqrt(runs): ~{need}")
+        worst_pair = max(rows, key=lambda r: r["spread"])
+        # spread and n_used describe the worst pair, the keys
+        # analyze_training_study.noise_floor reads.
         report[cls] = {"name": name, "pairs": rows, "worst_spread": worst,
+                       "spread": worst_pair["spread"], "n_used": worst_pair["n"],
                        "min_spread": min(spreads), "n_significant": len(sig),
                        "n_comparisons": len(rows)}
         print()
@@ -200,14 +207,13 @@ def main(argv):
     elif worst_overall < TARGET_EFFECT * 1.5:
         verdict, note = "MARGINAL", "spread is comparable to the effect; repeats are required"
     else:
-        verdict, note = "NO GO", ("spread exceeds the effect. The accuracy axis is not "
-                                  "measurable at this budget, and the cost-side result "
-                                  "stands on its own instead")
+        verdict, note = "NO GO", ("spread exceeds the effect; a single-run difference "
+                                  "must clear this floor before it is read")
     print(f"VERDICT: {verdict}\n  {note}")
     print(f"  across all classes, {total_sig} of {total_cmp} paired tests between "
           f"identical configurations reached p < {ALPHA}")
 
-    json.dump({"summaries": [str(p) for p in paths], "n_runs": len(runs),
+    json.dump({"summaries": [p.parts[-4] for p in paths], "n_runs": len(runs),
                "classes": report, "worst_spread": worst_overall,
                "target_effect": TARGET_EFFECT, "verdict": verdict,
                "n_significant": total_sig, "n_comparisons": total_cmp},

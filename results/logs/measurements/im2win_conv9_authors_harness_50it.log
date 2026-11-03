@@ -1,0 +1,18 @@
+# command
+ssh -o StrictHostKeyChecking=no -o ConnectTimeout=30 <host> "
+cd /workspace/im2win/build
+ls /workspace/im2win/data 2>/dev/null | head -5
+echo '=== init data (case 0) ==='
+timeout 300 ./main 'tensor_core' 0 2>&1 | tail -10
+echo '=== run conv9 ==='
+timeout 600 ./main 'tensor_core' 9 2>&1 | tail -20
+" 2>&1 | tail -35
+# date
+2026-09-19 05:20:09 UTC
+# output
+=== init data (case 0) ===
+init_data
+=== run conv9 ===
+test_conv9
+batch: 256
+37087.4

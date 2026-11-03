@@ -1,0 +1,25 @@
+# command
+ssh -o StrictHostKeyChecking=no -o ConnectTimeout=20 <host> "
+source /venv/main/bin/activate
+python3 << 'PYEOF'
+import pickle
+for tag,f in [('2D','nnUNetPlansv2.1_trgSp_1x1x1_plans_2D.pkl'),('3D','nnUNetPlansv2.1_trgSp_1x1x1_plans_3D.pkl')]:
+    try:
+        p = pickle.load(open('/workspace/nnUNet_preprocessed/Task003_Liver/'+f,'rb'))
+        st = p['plans_per_stage']
+        for k,v in st.items():
+            print(f'{tag} stage{k}: patch={v[\"patch_size\"]}, batch={v[\"batch_size\"]}, pools={v[\"num_pool_per_axis\"]}')
+        print(f'  base_num_features={p.get(\"base_num_features\")}, num_modalities={p.get(\"num_modalities\")}, num_classes={p.get(\"num_classes\")}')
+    except Exception as e:
+        print(f'{tag}: {e}')
+PYEOF
+" 2>&1 | tail -12
+# date
+2026-09-19 05:34:39 UTC
+# output
+Activated conda/uv virtual environment at /venv/main
+2D stage0: patch=[512, 512], batch=16, pools=[6, 6]
+  base_num_features=30, num_modalities=1, num_classes=2
+3D stage0: patch=[128, 128, 128], batch=2, pools=[5, 5, 5]
+3D stage1: patch=[128, 128, 128], batch=2, pools=[5, 5, 5]
+  base_num_features=30, num_modalities=1, num_classes=2

@@ -1,0 +1,54 @@
+# command
+ssh -o StrictHostKeyChecking=no -o ConnectTimeout=30 <host> "
+cd /workspace/win3d && source /venv/main/bin/activate
+python3 << 'PYEOF'
+import torch, torch.nn.functional as F, time
+from winconv import im2win_conv3d, im2win_conv3d_minmat
+torch.backends.cudnn.benchmark=True
+def t(fn,n=20):
+    for _ in range(8): fn()
+    torch.cuda.synchronize(); t0=time.time()
+    for _ in range(n): fn()
+    torch.cuda.synchronize(); return (time.time()-t0)/n
+print('nnU-Net 3D layers: cuDNN vs two windowed materialization strategies')
+print(f'{\"layer\":>16} {\"cuDNN\":>7} {\"k^2-mat\":>8} {\"k-mat\":>7} {\"r(k^2)\":>7} {\"r(k)\":>6}')
+L=[(30,30,128),(30,60,64),(60,60,64),(60,120,32),(120,120,32),(120,240,16),(240,240,16),(240,320,8),(320,320,8)]
+ra,rb=[],[]
+for cin,cout,sp in L:
+    B=2
+    x=torch.randn(B,cin,sp,sp,sp,device='cuda',dtype=torch.half)
+    w=torch.randn(cout,cin,3,3,3,device='cuda',dtype=torch.half)
+    o=(sp-3)+1; ops=2*B*cout*o*o*o*cin*27
+    tc=t(lambda:F.conv3d(x,w))
+    t2=t(lambda:im2win_conv3d(x,w))
+    t1=t(lambda:im2win_conv3d_minmat(x,w))
+    ra.append(tc/t2); rb.append(tc/t1)
+    print(f'{cin:5d}->{cout:<5d}{sp:4d} {ops/tc/1e12:7.2f} {ops/t2/1e12:8.2f} {ops/t1/1e12:7.2f} {tc/t2:6.2f}x {tc/t1:5.2f}x')
+    del x,w; torch.cuda.empty_cache()
+import math
+gm=lambda v: math.exp(sum(math.log(z) for z in v)/len(v))
+print()
+print(f'3D geomean, k^2 materialization (unfold D+H): {gm(ra):.3f}x')
+print(f'3D geomean, k   materialization (unfold D)  : {gm(rb):.3f}x')
+print(f'2D geomean (measured previously)            : 0.591x')
+PYEOF
+" 2>&1 | tail -16
+# date
+2026-09-19 08:00:02 UTC
+# output
+Activated conda/uv virtual environment at /venv/main
+nnU-Net 3D layers: cuDNN vs two windowed materialization strategies
+           layer   cuDNN  k^2-mat   k-mat  r(k^2)   r(k)
+   30->30    128   21.32     4.73   10.06   0.22x  0.47x
+   30->60     64   22.07     8.08   15.92   0.37x  0.72x
+   60->60     64   33.54     8.83   15.19   0.26x  0.45x
+   60->120    32   43.60    21.71   29.11   0.50x  0.67x
+  120->120    32   35.14    15.14   19.43   0.43x  0.55x
+  120->240    16   37.39    28.92   35.87   0.77x  0.96x
+  240->240    16   45.73    30.51   38.57   0.67x  0.84x
+  240->320     8   28.62    11.50   17.91   0.40x  0.63x
+  320->320     8   25.94    13.31   19.61   0.51x  0.76x
+
+3D geomean, k^2 materialization (unfold D+H): 0.429x
+3D geomean, k   materialization (unfold D)  : 0.654x
+2D geomean (measured previously)            : 0.591x

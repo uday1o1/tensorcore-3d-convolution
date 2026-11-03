@@ -21,7 +21,8 @@ it. nnU-Net's own mean does otherwise: on a case without tumour it gives Dice 0
 if the network predicts any tumour voxel and leaves the case out if it predicts
 none, so two runs are averaged over different sets of cases and a few stray
 voxels on one tumour-free scan move the mean by as much as a real difference.
-In this study one run marked 36 voxels on a tumour-free case and was averaged
+In this study five of the six runs compared with the baseline marked tumour on
+a tumour-free case the baseline left empty (3 to 83 voxels) and were averaged
 over 26 cases against the baseline's 25. False detections on cases without the
 class are reported separately, as a count of cases and voxels, and nnU-Net's
 own mean is kept alongside for comparison.
@@ -33,7 +34,6 @@ Usage:
   python bench/analyze_training_study.py
 """
 import json
-import math
 import statistics as st
 import sys
 from pathlib import Path
@@ -62,8 +62,10 @@ CONTROL = "nnUNetTrainerV2_MedNeXt_B_place_3_3_3_3_continued_150ep"
 def noise_floor(n_present):
     """Seed spread per class from the variance pilot, on this script's case rule.
 
-    The pilot averaged over cases scored in both runs (n_used), which for
-    tumour included tumour-free cases where both runs scored 0. Every case that
+    The pilot records per class the spread of its worst pair of runs and the
+    number of cases that pair averaged over (spread, n_used): cases scored in
+    both runs, which for tumour included tumour-free cases where both runs
+    scored 0. Every case that
     contains the class is scored in every run, so the pilot's set is those
     cases plus tumour-free ones contributing a difference of exactly zero. The
     summed difference is therefore the same on both rules and only the divisor

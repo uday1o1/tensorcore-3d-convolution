@@ -1,14 +1,16 @@
 """Does the crossover, and the rule read off it, survive a change of GPU?
 
-Everything else in this project was measured on an RTX 3090. That is the right
-device for the reproduction, since it is the GPU class Im2win's own evaluation
-used, but it makes every quantitative claim a property of one machine. The
+The crossover grid, held-out test and training sweep are measured on an RTX
+3090 and repeated on an RTX 4090. The 3090 is the right device for the
+reproduction, since it is the GPU class Im2win's own evaluation used, but
+results from one device are a property of that machine. The
 decision rule in src/dispatch.py is the clearest case: its thresholds encode
 that device's Tensor Core geometry, its memory bandwidth, and the particular
 set of algorithms cuDNN ships for sm_86.
 
 This script compares device-tagged result files against each other. It does not
-measure anything; run the sweeps on each device first.
+measure anything; run the sweeps on each device first. It reads results/ in the
+repository, so copy files written under BENCH_RESULTS_DIR back there first.
 
 PREDICTION, recorded before any non-Ampere data was collected:
 
@@ -34,9 +36,8 @@ PREDICTION, recorded before any non-Ampere data was collected:
 
   We make no directional prediction for the backward pass asymmetry (windowed
   averaging 1.030 against cuDNN on backward while averaging 0.940 on forward).
-  Whether that reproduces is the single most important thing this comparison
-  can tell us, because it is currently the paper's strongest claim and rests on
-  one device.
+  Whether that reproduces on a second device is the most important thing this
+  comparison can tell us.
 
 Usage:  python compare_devices.py
 """
@@ -95,8 +96,8 @@ def session_agreement(maps, trains):
     """Do two independent sessions on the same host agree on each winner?
 
     Each device's forward convolutions were measured twice: once in the
-    crossover sweep, interleaved, and once in the training sweep, in blocks.
-    Same shapes, same host, different session and ordering. Within-session
+    crossover sweep and once as the forward-only timing in the training sweep.
+    Same shapes, same host, different session. Within-session
     trial spread cannot reveal session-to-session variation, since a
     consistently biased session is also consistent. Agreement between the two
     sessions can.
@@ -220,8 +221,8 @@ def main():
               f"({r3_cud/r3_gap:.3f}x -> {r9_cud/r9_gap:.3f}x)")
 
     # Why the surface moves: do the two algorithms gain differently from the
-    # newer device, and where? This replaces citing vendor specifications with
-    # a like-for-like measurement on identical shapes.
+    # newer device, and where? Measured like for like on identical shapes
+    # rather than taken from vendor specifications.
     if len(maps) >= 2 and "rtx3090" in maps and any("4090" in k for k in maps):
         newer = next(k for k in maps if "4090" in k)
         A = {(r["C"], r["sp"], r["k"]): r for r in maps["rtx3090"]
@@ -246,7 +247,8 @@ def main():
             c, w = gains(f)
             who = "cuDNN" if c > w else "windowed"
             print(f"  {name:<26}{c:>8.2f}{w:>10.2f}   {who}")
-        print("  Overall the two gain almost equally, so the surface does not move"
+        print("  On the committed RTX 3090 and RTX 4090 maps the two gain almost"
+              "\n  equally overall, so the surface does not move"
               "\n  because one algorithm is uniformly better served by newer silicon."
               "\n  It moves because the gain is redistributed by shape: cuDNN gains"
               "\n  more at 240 channels, which is where the rule selects, and the"
@@ -278,8 +280,9 @@ def main():
                   f"{len(naive)}/{len(cells)}")
             print(f"  ...counting only cells both sessions agree on, on both: "
                   f"{len(robust)}/{len(cells)}")
-            print("  One host per GPU, so these are differences between two hosts;"
-                  "\n  the GPU and the host cannot be separated with this data.")
+            print("  One host per GPU in this comparison, so these are differences"
+                  "\n  between two hosts; the second RTX 4090 host below separates the"
+                  "\n  GPU from the host.")
         for tag, a in agree.items():
             r2 = [k for k in a["cells"] if k[0] >= 240 and k[2] >= 5]
             k3 = [k for k in a["cells"] if k[2] == 3]
@@ -305,7 +308,7 @@ def main():
         for k in h["same_gpu_changes"]:
             print(f"      same GPU, different winner: C{k[0]} sp{k[1]} k{k[2]}")
 
-    # The claim that matters most, and the one we made no prediction about.
+    # The backward asymmetry, about which no prediction was made.
     trains = load("training_crossover")
     if trains:
         print("\nFORWARD VERSUS BACKWARD ACROSS DEVICES")
@@ -330,8 +333,6 @@ def main():
             every = all(asym.values())
             print(f"\n  backward beats forward on every device: {every}"
                   f"  {asym}")
-            print("  (this is the paper's strongest claim and the reason for "
-                  "running a second device at all)")
     return 0
 
 

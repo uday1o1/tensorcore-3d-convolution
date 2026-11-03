@@ -1,11 +1,12 @@
-"""Accuracy non-inferiority: cuDNN against windowed on IDENTICAL trained weights.
+"""Accuracy check: cuDNN against windowed on IDENTICAL trained weights.
 
 Both configurations run the same trained network over the same validation cases
 with the same sliding window procedure, differing only in which convolution
 kernel computes each layer. Because the weights are identical, any difference
 is the kernel's numerics alone, with no training variance to confound it.
 
-This is the one script in bench/ that needs artifacts beyond the repo: a
+Besides analyze_variance_pilot.py, which reads the pilot runs' validation
+summaries, this is the one script in bench/ that needs data beyond the repo: a
 preprocessed nnU-Net dataset and a trained checkpoint. It locates them from
 nnU-Net's own environment variables, or from explicit arguments, and tells you
 precisely what is missing rather than failing on an obscure path error.
@@ -156,8 +157,9 @@ def resolve(args):
               "trained checkpoint, which are not in the repository:\n")
         for m in missing:
             print(f"  - {m}")
-        print("\nEvery other benchmark in bench/ runs on synthetic tensors and "
-              "needs only a GPU. See the README for which results need what.")
+        print("\nThe timing benchmarks in bench/ run on synthetic tensors and the "
+              "analysis scripts read committed files in results/. See the README "
+              "for which results need what.")
         return None
     return pre, ck, splits
 
@@ -168,7 +170,10 @@ def main():
     ap.add_argument("--preprocessed", help="directory holding the .npz cases")
     ap.add_argument("--checkpoint", help="trained model_best.model")
     ap.add_argument("--splits", help="splits_final.pkl defining the validation fold")
-    ap.add_argument("--fold", type=int, default=0)
+    ap.add_argument("--fold", type=int, default=0,
+                    help="cross-validation fold whose validation cases are evaluated; "
+                         "the default checkpoint path is fold_0's, so pass "
+                         "--checkpoint for another fold")
     ap.add_argument("--cases", type=int, default=0,
                     help="limit number of validation cases, 0 means all")
     ap.add_argument("--out", default=str(results_dir() / "dice_identical_weights.json"))

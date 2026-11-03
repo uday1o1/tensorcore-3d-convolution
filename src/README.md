@@ -6,7 +6,8 @@ the baselines it is compared against.
 The published Im2win kernels this project reproduces are hand-specialized per
 benchmark layer: their launch geometry contains literal constants (conv9 uses
 `dim3(CEIL_DIV(M, TILE), 18, 54*6)`, where 54 is that layer's output height),
-and they return silently zero or partially computed output at any other shape.
+and at the other shapes we tested they return silently zero or partially
+computed output.
 There is therefore no general implementation to port, and this code is a
 from-scratch general implementation rather than an adaptation.
 
@@ -38,21 +39,21 @@ from-scratch general implementation rather than an adaptation.
 
 The channel grouping in both 3D paths depends on the unfold ordering the
 materialized axis as `(c, kd)` rather than `(kd, c)`. Getting this backwards is
-silently wrong, not an error, and it has already happened once in this project.
-`bench/verify_correctness.py` covers it on GPU; the ordering is additionally
-validated against a naive reference in exact arithmetic.
+silently wrong, not an error. `bench/verify_correctness.py` covers it on GPU;
+the ordering is additionally validated in float64 against a naive reference by
+`bench/verify_depthwise_indexing.py`, which needs only numpy.
 
 **`fftconv.py`**: `fft_conv3d(x, w)`, FFT-based 3D convolution, stride 1.
-Included as the natural third algorithm, since its cost is independent of
-kernel size. Measured here it is not competitive at realistic channel widths:
-in frequency space the channel reduction becomes a dense complex multiply
-whose cost the kernel-size savings do not touch.
+Included as the natural third algorithm, since its cost depends on kernel size
+only through padding. In frequency space the channel reduction becomes a dense
+complex multiply whose cost the kernel-size savings do not touch.
 
 **`dispatch.py`**: `prefer_windowed(channels, spatial, kernel_size)` is the
 decision rule read off the crossover grid, and `DispatchingConv3d` is a drop-in
 `nn.Conv3d` that applies it per layer shape and caches the choice. Policies are
 `rule` (shape only, zero runtime cost), `autotune` (time both once per shape,
-the exact upper bound the rule is scored against), and the two pure baselines.
+the measured reference the rule is compared with on whole networks), and the
+two pure baselines.
 `convert(model, policy)` swaps a whole network in place, preserving weights.
 
 The accuracy comparison on identical trained weights lives in
@@ -78,20 +79,21 @@ to between 0.00e+00 and 2.4e-06.
 ## Usage
 
 ```python
+import sys; sys.path.insert(0, 'src')   # from the repository root
 import torch
 from winconv import im2win_conv3d_minmat, WindowedConv3d
 
 x = torch.randn(2, 60, 64, 64, 64, device='cuda', dtype=torch.half)
 w = torch.randn(60, 60, 9, 9, 9, device='cuda', dtype=torch.half)
-y = im2win_conv3d_minmat(x, w)          # beats cuDNN at this shape
+y = im2win_conv3d_minmat(x, w)          # 1.20x cuDNN on the RTX 3090, 0.94x on the RTX 4090
 
 layer = WindowedConv3d(60, 60, 3, padding=1).cuda()   # drop-in for nn.Conv3d
 ```
 
 ## When to use this
 
-At kernel size 3 the windowed method loses to cuDNN in all 12 shapes measured,
-by a factor of two to three, and substituted into a whole network it is 2.34x
+At kernel size 3 the windowed method loses to cuDNN in all 12 shapes measured
+on the RTX 3090, by a factor of 1.1 to 1.9, and substituted into a whole network it is 2.34x
 slower on 3.9x the memory. At 240 channels with kernel size 5 or larger it wins
-in all 12 shapes measured, by up to 1.73x. Speedups across the whole grid reach
+in 11 of the 12 shapes measured, the twelfth at parity (0.997), by up to 1.68x. Speedups across the whole grid reach
 2.36x. See `bench/bench_crossover.py` for the map and its trial spread.

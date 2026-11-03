@@ -1,0 +1,17 @@
+# command
+ssh -o StrictHostKeyChecking=no -o ConnectTimeout=20 <host> "
+echo -n '2D npz files: '; ls /workspace/nnUNet_preprocessed/Task003_Liver/nnUNetData2D_plans_v2.1_trgSp_1x1x1_stage0/*.npz 2>/dev/null | wc -l
+echo -n 'procs remaining: '; ps aux | grep mednextv1_plan | grep -v grep | wc -l
+echo '--- log tail ---'; tail -3 /workspace/preprocess_2d.log
+df -h /workspace | tail -1
+" 2>&1 | tail -8
+# date
+2026-09-19 05:55:04 UTC
+# output
+2D npz files: 131
+procs remaining: 0
+--- log tail ---
+1 22478
+2 7469
+saving:  /workspace/nnUNet_preprocessed/Task003_Liver/nnUNetData2D_plans_v2.1_trgSp_1x1x1_stage0/liver_99.npz
+overlay         102G   62G   41G  61% /
