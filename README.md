@@ -16,8 +16,9 @@ Part II takes the cost as close to fixed and asks where to spend it, in MedNeXt 
   project proposal with its survey of related work and its novelty and
   feasibility review; this README and
   `results/` describe what was built and measured.
-- `src/`: shape-generic windowed convolution for 2D and 3D, FFT convolution, the
-  drop-in `nn.Conv3d` replacement, the shape-aware dispatcher, and the per-stage
+- `src/`: shape-generic windowed convolution for 2D and 3D, built from PyTorch
+  operations with no custom CUDA kernel, FFT convolution, the drop-in
+  `nn.Conv3d` replacement, the shape-aware dispatcher, and the per-stage
   kernel placement utilities. See `src/README.md`.
 - `bench/`: correctness verification and the benchmarks behind the reported
   numbers; the Part I measurements made with short inline scripts are recorded
