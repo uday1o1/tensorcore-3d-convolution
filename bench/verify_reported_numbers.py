@@ -102,6 +102,28 @@ CLAIMED = {
     "study, 5-5-5-5 tumour gain over kernel 3": "+0.0465",
     "study, 5-5-5-5 tumour gain over continued": "+0.0056",
     "study, tumour comparisons beyond seed spread": 1,
+    # cuDNN on Im2win's conv9 layer, second RTX 3090 host
+    "conv9, cuDNN processes": 25,
+    "conv9, cuDNN distinct kernel sets": 1,
+    "conv9, cuDNN events best min": "41.2",
+    "conv9, cuDNN events best max": "41.4",
+    "conv9, Im2win kernel best min, same host": "36.3",
+    "conv9, Im2win kernel best max, same host": "36.9",
+    "conv9, Im2win over cuDNN low, same host": "0.88",
+    "conv9, Im2win over cuDNN high, same host": "0.90",
+    # Early-placement controls and the training patch size
+    "controls, 5-5-3-3 step cost": "1.80",
+    "controls, 7-5-5-3 step cost": "2.91",
+    "controls, 3-3-5-5 step cost": "1.07",
+    "controls, 3-5-5-7 step cost": "1.28",
+    "controls, 5-5-5-5 step cost": "1.87",
+    "controls, 5-5-3-3 90 percent mass": 59,
+    "controls, 7-5-5-3 90 percent mass": 59,
+    "patch 128, 3-3-5-5 step cost": "1.08",
+    "patch 128, 3-5-5-7 step cost": "1.35",
+    "patch 128, 5-5-5-5 step cost": "2.27",
+    "patch 128, 5-5-3-3 step cost": "2.20",
+    "patch 128, 7-5-5-3 step cost": "3.94",
 }
 # Integers are counts and must match exactly. Every other claim is written as
 # a string with the decimals the prose prints, and must equal the computed
@@ -289,6 +311,45 @@ def main():
         for n in ("3-5-5-7", "5-5-5-5"):
             computed[f"placement, {n} receptive field"] = erf[n]["theoretical"]
             computed[f"placement, {n} 90 percent mass"] = erf[n]["mass90"]
+
+    runs_path = ROOT / "results" / "cudnn_conv9_runs_rtx3090.json"
+    same_host = ROOT / "results" / "logs" / "conv9_same_host.log"
+    if runs_path.exists() and same_host.exists():
+        import re
+        runs = json.load(open(runs_path))
+        ev = [r["events_best_tflops"] for r in runs]
+        computed["conv9, cuDNN processes"] = len(runs)
+        computed["conv9, cuDNN distinct kernel sets"] = len({tuple(r["kernels"]) for r in runs})
+        computed["conv9, cuDNN events best min"] = min(ev)
+        computed["conv9, cuDNN events best max"] = max(ev)
+        log = open(same_host).read()
+        im = [float(x) for x in re.findall(r"TFLOPS_best ([\d.]+)", log)]
+        cu = [float(x) for x in re.findall(r"events best\s+([\d.]+)", log)]
+        computed["conv9, Im2win kernel best min, same host"] = min(im)
+        computed["conv9, Im2win kernel best max, same host"] = max(im)
+        computed["conv9, Im2win over cuDNN low, same host"] = min(im) / max(cu)
+        computed["conv9, Im2win over cuDNN high, same host"] = max(im) / min(cu)
+    else:
+        for k in list(CLAIMED):
+            if k.startswith("conv9,"):
+                CLAIMED.pop(k)
+    for tag, prefix in (("controls", "controls"), ("p128", "patch 128")):
+        p = ROOT / "results" / f"receptive_field_cost_{tag}.json"
+        if not p.exists():
+            for k in list(CLAIMED):
+                if k.startswith(prefix + ","):
+                    CLAIMED.pop(k)
+            continue
+        c = {r["placement"]: r for r in json.load(open(p))}
+        for name in c:
+            key = f"{prefix}, {name} step cost"
+            if key in CLAIMED:
+                computed[key] = c[name]["train_ms"] / c["3-3-3-3"]["train_ms"]
+    ec = ROOT / "results" / "effective_receptive_field_controls.json"
+    if ec.exists():
+        e = {r["placement"]: r for r in json.load(open(ec))}
+        for name in ("5-5-3-3", "7-5-5-3"):
+            computed[f"controls, {name} 90 percent mass"] = e[name]["mass90"]
 
     study_path = ROOT / "results" / "training_study.json"
     if study_path.exists():

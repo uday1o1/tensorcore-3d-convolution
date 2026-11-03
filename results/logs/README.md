@@ -21,6 +21,14 @@ whole-network substitution) are in `measurements/`, indexed in its own README.
 | `train4090.log` | `../training_crossover_rtx4090.json` | `python bench/bench_training_crossover.py 5` |
 | `disp4090.log` | `../dispatch_heldout_rtx4090.json` | `python bench/bench_dispatch.py 5` |
 | `crossover_host2_s1.log`, `crossover_host2_s2.log` | `../host2/crossover_map_s1.json`, `../host2/crossover_map_s2.json`, two sessions on the second RTX 4090 host | `python bench/bench_crossover.py 7`, run twice, renaming the output after each |
+| `cudnn_conv9.log` | `../cudnn_conv9_runs_rtx3090.json`, 25 fresh processes on the second RTX 3090 host | `python bench/bench_cudnn_conv9.py 20` |
+| `conv9_same_host.log` | the released Im2win conv9 kernel and cuDNN alternated five times on the second RTX 3090 host | `for i in 1 2 3 4 5; do ./sweep 256 64 56 56 64 3 1; python bench/bench_cudnn_conv9.py 1; done`, with `sweep` built from `bench/CMakeLists.txt` and the conv9 kernel source |
+| `reproduce_im2win.log` | kernel-only and full-accounting ratios on conv9, second RTX 3090 host | `python bench/bench_reproduce_im2win.py` |
+| `rf_controls.log` | `../receptive_field_cost_controls.json` | `python bench/bench_receptive_field.py --controls --tag controls` |
+| `rf_p128.log` | `../receptive_field_cost_p128.json` | `python bench/bench_receptive_field.py --controls --patch 128 --tag p128` |
+| `erf_controls.log` | `../effective_receptive_field_controls.json` | `python bench/bench_effective_receptive_field.py --controls` |
+| `verify_correctness.log` | correctness of every implementation, second RTX 3090 host | `python bench/verify_correctness.py` |
+| `setup_bench.log` | provisioning of the second RTX 3090 host, with its smoke test | `scripts/setup_vast.sh launch setup-bench` |
 
 `bench_dispatch_network.py` writes `../dispatch_network.json`; the two
 `netdispatch` runs have no committed JSON, so their numbers live in these logs.
@@ -78,3 +86,8 @@ excluded only as far as those files share the Part I host.
   (`../validation/training_host_rtx4090.txt`).
 - RTX 3090 training host: driver 580.126.09, AMD Ryzen 9 5950X, 320 W power
   limit (`../validation/training_host_rtx3090.txt`).
+- Second RTX 3090 host, for the cuDNN conv9 sweep, the early-placement
+  controls and the 128-cubed cost: driver 595.71.05, Intel Xeon E5-2673 v4,
+  320 W power limit, PyTorch 2.11.0+cu128 with cuDNN 9.19.0
+  (`host_rtx3090_second.txt`); every row of its cost and cuDNN JSON files
+  records the same, and its receptive field file records the GPU name.

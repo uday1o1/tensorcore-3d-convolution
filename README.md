@@ -6,9 +6,9 @@
 
 Volumetric medical segmentation networks are built on 3D convolution, and its cost limits how far they can grow: MedNeXt notes that the computational requirements of indefinitely scaling kernel sizes in 3D networks quickly become prohibitive. This project asks two questions about that cost: can the convolution itself be made cheaper, and, since largely it cannot, where in a network is it worth spending?
 
-Part I examines windowed convolution (Im2win), a memory-efficient method developed across papers from 2022 to 2026, all two-dimensional, whose most recent version reports 1.4 times cuDNN's overall Tensor Core throughput. Reproduced on the authors' 3x3 benchmark layer, the released kernel reaches 37.0 TFLOPS against cuDNN's 23.8 in dedicated timing runs, a ratio of 1.56, but the published timing leaves the window materialization outside the timed loop, and charging for it on the GPU moves the ratio to 1.13. cuDNN's own throughput on that layer varies between runs from 17.6 to 42.4 TFLOPS, so even the kernel-level comparison depends on which cuDNN run it is set against. The three released kernels whose launch grids we recorded use hardcoded grid dimensions, and the conv9 kernel, run at eight single-parameter variations of its benchmark shape, returns silently zero or partially computed output at seven of them. A shape-generic windowed convolution for 2D and 3D, verified against cuDNN, is 2.34 times slower on 3.9 times the memory inside a whole 3D segmentation network at kernel size 3, with Dice unchanged to four decimal places (mean voxel agreement 1.000000, lowest case 0.999999, across 27 validation cases on identical trained weights). The outcome is consistent with materialization volume relative to reduction depth setting the cost, and three manipulations agree with that account: dimensionality, materialization strategy and kernel size. Because the two algorithms scale differently in kernel size, their curves cross: over 60 configurations at seven trials each the windowed method wins 26, none of the 12 at kernel size 3 and 11 of 12 at 240 channels with kernel size 5 or above, saving up to 735 ms on a single convolution. A rule reading only layer shape lands within 2.1 percent of a per-shape oracle on that grid and 4.1 percent on held-out shapes, against 13.2 and 16.0 percent (12.6 and 9.8 held out) for the two pure strategies. On whole networks it falls short of cuDNN at kernel size 5 (0.994x) and regresses at kernel size 9 (0.819x), and on a second GPU its advantage over always calling cuDNN on held-out shapes shrinks to 0.01 percent; both are reported rather than tuned away.
+Part I examines windowed convolution (Im2win), a memory-efficient method developed across papers from 2022 to 2026, all two-dimensional, whose most recent version reports 1.4 times cuDNN's overall Tensor Core throughput. On the authors' 3x3 benchmark layer the published timing leaves the window materialization outside the timed loop. On one RTX 3090 host the released kernel reached 37.0 TFLOPS against cuDNN's 23.8 in dedicated timing runs, a ratio of 1.56 that charging for the materialization moves to 1.13, but cuDNN on that host varied between runs from 17.6 to 42.4 TFLOPS. On a second RTX 3090 with the same driver and libraries, cuDNN ran at 41.2 to 41.4 TFLOPS in all 25 fresh processes, launching the same implicit GEMM kernel every time, while the released kernel alternated with it reached 36.3 to 36.9: there cuDNN is faster even at the kernel level, the kernel at 0.88 to 0.90 of it, and 0.65 once the materialization is charged. The three released kernels whose launch grids we recorded use hardcoded grid dimensions, and the conv9 kernel, run at eight single-parameter variations of its benchmark shape, returns silently zero or partially computed output at seven of them. A shape-generic windowed convolution for 2D and 3D, verified against cuDNN, is 2.34 times slower on 3.9 times the memory inside a whole 3D segmentation network at kernel size 3, with Dice unchanged to four decimal places (mean voxel agreement 1.000000, lowest case 0.999999, across 27 validation cases on identical trained weights). The outcome is consistent with materialization volume relative to reduction depth setting the cost, and three manipulations agree with that account: dimensionality, materialization strategy and kernel size. Because the two algorithms scale differently in kernel size, their curves cross: over 60 configurations at seven trials each the windowed method wins 26, none of the 12 at kernel size 3 and 11 of 12 at 240 channels with kernel size 5 or above, saving up to 735 ms on a single convolution. A rule reading only layer shape lands within 2.1 percent of a per-shape oracle on that grid and 4.1 percent on held-out shapes, against 13.2 and 16.0 percent (12.6 and 9.8 held out) for the two pure strategies. On whole networks it falls short of cuDNN at kernel size 5 (0.994x) and regresses at kernel size 9 (0.819x), and on a second GPU its advantage over always calling cuDNN on held-out shapes shrinks to 0.01 percent; both are reported rather than tuned away.
 
-Part II takes the cost as close to fixed and asks where to spend it, in MedNeXt with standard operations only. Placing large kernels in the deep stages (3-5-5-7) obtains more receptive field than enlarging every stage (5-5-5-5) at 1.32 against 2.00 times the training step cost, so uniform enlargement is dominated without any accuracy measurement. Trained on MSD Liver, every UpKern placement gains about 0.001 liver Dice over kernel 3, but kernel 3 retrained by the same protocol gains 0.0008, and against that control no placement's difference exceeds the seed spread: on this task the larger kernels add no accuracy the design can resolve.
+Part II takes the cost as close to fixed and asks where to spend it, in MedNeXt with standard operations only. Placing large kernels in the deep stages (3-5-5-7) obtains more receptive field than enlarging every stage (5-5-5-5) at 1.32 against 2.00 times the training step cost, so uniform enlargement is dominated without any accuracy measurement; the same kernels placed in the shallow stages instead cost 1.80 and 2.91 times and add no measured reach, and at the 128-cubed training patch the deep placement costs 1.35 against 2.27. Trained on MSD Liver, every UpKern placement gains about 0.001 liver Dice over kernel 3, but kernel 3 retrained by the same protocol gains 0.0008, and against that control no placement's difference exceeds the seed spread: on this task the larger kernels add no accuracy the design can resolve.
 
 ## Repository Contents
 
@@ -33,13 +33,17 @@ made cheaper. The second takes the answer as given and asks where the
 convolution is worth spending.
 
 **Part I, windowed convolution.** Presented in the literature as a faster
-alternative to cuDNN, measured with complete accounting its advantage at
-kernel size 3 is small and run-dependent: on the authors' own 3x3 benchmark
-layer it falls from 1.56x to 1.13x once the window materialization is timed
-(against the fastest of 50 cuDNN trials in a dedicated timing run, 23.8
-TFLOPS; across runs cuDNN ranges from 17.6 to 42.4 TFLOPS on that
-layer, the top above the kernel's 37.0), and substituted into a whole
-3D segmentation network it is 2.34x slower on 3.9x the memory, with Dice
+alternative to cuDNN, it is not at kernel size 3 once measured on equal terms.
+On the authors' own 3x3 benchmark layer, one RTX 3090 host gave the released
+kernel 1.56x cuDNN in dedicated timing runs (37.0 against 23.8 TFLOPS) and
+1.13x once the window materialization is timed, but cuDNN there ranged from
+17.6 to 42.4 TFLOPS between runs. A second RTX 3090 with the same driver and
+libraries settles it: cuDNN ran at 41.2 to 41.4 TFLOPS in all 25 fresh
+processes with the same implicit GEMM kernel, and the released kernel,
+alternated with it on that host, reached 36.3 to 36.9, so cuDNN is faster even
+at the kernel level (0.88x to 0.90x) and the windowed path is 0.65x with the
+materialization charged. Substituted into a whole 3D segmentation network the
+shape-generic implementation is 2.34x slower on 3.9x the memory, with Dice
 unchanged to four decimal places.
 
 The two algorithms do scale differently in kernel size, and the curves cross.
@@ -90,6 +94,31 @@ finds no accuracy difference this design can resolve between the placements
 and kernel 3 trained for the same total epochs, kernel 3 is the cheapest of
 them on FLOPs, latency and step cost, with peak training memory 2.55 GB for
 all four.
+
+Two controls test whether depth, rather than the number of enlarged layers,
+sets the price. Mirroring the deep placements into the shallow stages
+(5-5-3-3 for 3-3-5-5, 7-5-5-3 for 3-5-5-7) enlarges the same kernels where the
+spatial extent is largest. In a second session on another RTX 3090
+(`results/receptive_field_cost_controls.json`,
+`results/effective_receptive_field_controls.json`), the mirrors cost 1.80x and
+2.91x the kernel 3 step against 1.07x and 1.28x for the deep originals, and
+their 90 percent mass extent is 59 voxels, the same as kernel 3, against 70
+and 73. At the 128-cubed patch the study trained with
+(`results/receptive_field_cost_p128.json`), the order holds and the gaps
+widen:
+
+| Placement | Step cost, 64-cubed (second session) | Step cost, 128-cubed | 90% mass extent |
+|---|---|---|---|
+| 3-3-3-3 | 1.00x | 1.00x | 59 |
+| 3-3-5-5 | 1.07x | 1.08x | 70 |
+| 3-5-5-7 | 1.28x | 1.35x | 73 |
+| 5-5-5-5 | 1.87x | 2.27x | 67 |
+| 5-5-3-3 | 1.80x | 2.20x | 59 |
+| 7-5-5-3 | 2.91x | 3.94x | 59 |
+
+The second session's ratios for the four study placements (1.07, 1.28, 1.87)
+sit below the first's (1.08, 1.32, 2.00) and keep their order; peak training
+memory is 2.55 GB at 64-cubed and 20.1 GB at 128-cubed for every placement.
 
 **Trained comparison: no measurable accuracy gain from the larger kernels.**
 Each placement was trained for 150 epochs on fold 0 of MSD Liver, under the
@@ -171,11 +200,12 @@ trained checkpoint.
 | `bench/bench_dispatch.py` | `results/dispatch_heldout_<gpu>.json`, held-out rule test | GPU only |
 | `bench/bench_training_crossover.py` | `results/training_crossover_<gpu>.json`, forward vs backward vs full step | GPU only |
 | `bench/compare_devices.py` | cross-device comparison and prediction audit | nothing, reads `results/` |
-| `bench/bench_receptive_field.py` | `results/receptive_field_cost.json`, Part II cost axis | GPU + MedNeXt fork |
-| `bench/bench_effective_receptive_field.py` | `results/effective_receptive_field.json`, measured reach | GPU + MedNeXt fork |
+| `bench/bench_receptive_field.py` | `results/receptive_field_cost.json`, Part II cost axis; with `--controls --tag controls` adds 5-5-3-3 and 7-5-5-3 (`receptive_field_cost_controls.json`), with `--controls --patch 128 --tag p128` the training patch size (`receptive_field_cost_p128.json`) | GPU + MedNeXt fork |
+| `bench/bench_effective_receptive_field.py` | `results/effective_receptive_field.json`, measured reach; with `--controls`, `effective_receptive_field_controls.json` | GPU + MedNeXt fork |
 | `bench/analyze_variance_pilot.py` | `results/variance_pilot.json`, the seed spread | the validation summaries of two or more seed runs, passed as paths or found under `$RESULTS_FOLDER`; the two pilot summaries behind the committed file are not in the repository, their training logs are (`results/logs/pilot_s1.log`, `pilot_s2.log`) |
 | `bench/analyze_training_study.py` | `results/training_study.json`, placement and UpKern comparisons with cost and Dice | nothing, reads `results/validation/` and the committed cost, receptive field and pilot files |
-| `bench/bench_reproduce_im2win.py` | the 1.56x and 1.13x reproduction figures | GPU only; the kernel-only figure is a constant measured with `bench/sweep_convs.cpp`, built via `bench/CMakeLists.txt` inside an Im2win clone |
+| `bench/bench_cudnn_conv9.py` | `results/cudnn_conv9_runs_<gpu>.json`, cuDNN on Im2win's conv9 layer in fresh processes, with the kernels each launched | GPU only |
+| `bench/bench_reproduce_im2win.py` | kernel-only and full-accounting ratios on conv9 against cuDNN timed in the same run (1.56x and 1.13x on the first RTX 3090 host, `results/logs/measurements/`; 0.90x and 0.65x on the second, `results/logs/reproduce_im2win.log`) | GPU only; the kernel-only figure is a constant measured with `bench/sweep_convs.cpp`, built via `bench/CMakeLists.txt` inside an Im2win clone |
 | `bench/bench_end_to_end.py` | whole network substitution cost | GPU + MedNeXt fork |
 | `bench/bench_dispatch_network.py` | dispatcher on real networks | GPU + MedNeXt fork |
 | `bench/bench_dice_identical_weights.py` | `results/dice_identical_weights.json` | GPU + MedNeXt fork + preprocessed MSD Liver + a trained checkpoint |
@@ -210,8 +240,9 @@ UpKern placements on another machine, copy the kernel 3 run's
 recorded host, with torch pinned in `scripts/setup_vast.sh`; the RTX 3090 measurement
 host and the first RTX 4090 benchmark host ran Python 3.12 (paths in
 `results/logs/measurements/layout_conversion_shares.log` and
-`results/logs/cross4090.log`). Results tagged `rtx3090` were measured on an RTX 3090
-and carry no machine fields; the logs in `results/logs/measurements/` come
+`results/logs/cross4090.log`). The crossover, held-out and training sweep
+files tagged `rtx3090` were measured on an RTX 3090 and carry no machine
+fields; the logs in `results/logs/measurements/` come
 from one RTX 3090 host (24 GB, driver 595.71.05, recorded in
 `results/logs/measurements/host_rtx3090_main_versions.log`); results tagged
 `rtx4090` were measured on an RTX 4090 and record its library versions in each
@@ -223,6 +254,10 @@ GPU from the host on the 4090 side. The placement study trained on the hosts
 recorded in `results/validation/training_host_rtx3090.txt` (driver 580.126.09,
 AMD Ryzen 9 5950X, 320 W limit) and `training_host_rtx4090.txt` (the same recorded
 driver, processor and power limit as the second RTX 4090 host); `results/logs/README.md` lists which run used which.
+A second RTX 3090 host (driver 595.71.05, Intel Xeon E5-2673 v4, 320 W limit,
+`results/logs/host_rtx3090_second.txt`) produced
+`cudnn_conv9_runs_rtx3090.json`, the early-placement controls and the
+128-cubed cost, each row recording its machine.
 
 Two sessions of the same convolutions on the same GPU model can disagree. On
 the RTX 3090, 4 of 60 cells change winner between sessions, so single cells near
@@ -230,8 +265,8 @@ parity should not be read as settled; `bench/compare_devices.py` reports which
 cells two sessions agree on. The crossover, held-out and training sweep
 scripts alternate which algorithm is timed first, discard warm-up calls, and
 record driver, power limit, clocks and host processor with every row; the
-files in `results/host2/` carry these fields and the per-order ratios. The `rtx4090` files record the GPU and library versions only, the
-`rtx3090` files no machine fields, so that they and the Part I logs came from
+files in `results/host2/` carry these fields and the per-order ratios. The `rtx4090` sweep files record the GPU and library versions only, the
+`rtx3090` sweep files no machine fields, so that they and the Part I logs came from
 one machine is not recorded; "the RTX 3090 host" names the machine or
 machines behind those files. Neither set
 was measured with alternating order. Across the two `results/host2/` sessions,
@@ -240,7 +275,9 @@ ranges from 0.98 to 1.03.
 
 **Running on a rented instance.** `scripts/setup_vast.sh launch setup` installs
 the pinned PyTorch build and the MedNeXt fork, downloads and preprocesses MSD
-Task03 Liver, and runs a smoke test, detached and resumable stage by stage. It
+Task03 Liver, and runs a smoke test, detached and resumable stage by stage;
+`launch setup-bench` does the same without the dataset, for the GPU
+benchmarks alone. It
 is the only file in the repository that knows anything about the instance
 layout; it writes `env.sh`, which sets `BENCH_RESULTS_DIR` outside the checkout
 so fresh results never block `git pull`. Without that variable, output goes to
@@ -250,9 +287,11 @@ the run directory as soon as it finishes.
 
 cuDNN shows real run to run variance on this hardware, so the convolution
 sweeps report medians of repeated trials, and whole-network and placement
-timings average a timed loop after warm-up. The Im2win reproduction compares
-against the fastest of cuDNN's dedicated timing runs (23.8 TFLOPS); a back to
-back run of the same shape alongside another measurement reached 42.4. Absolute
+timings average a timed loop after warm-up. On the first RTX 3090 host the
+Im2win reproduction compares against the fastest of cuDNN's dedicated timing
+runs (23.8 TFLOPS), and a back to back run of the same shape alongside another
+measurement reached 42.4; on the second, all 25 fresh processes ran at 41.2 to
+41.4 with one kernel (`results/cudnn_conv9_runs_rtx3090.json`). Absolute
 timings will differ on other hardware, and so can the crossover: 13 of the 54
 settled configurations change winner between the RTX 3090 and RTX 4090 hosts.
 
