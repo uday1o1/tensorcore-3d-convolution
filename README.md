@@ -224,16 +224,16 @@ recorded in `results/validation/training_host_rtx3090.txt` (driver 580.126.09,
 AMD Ryzen 9 5950X, 320 W limit) and `training_host_rtx4090.txt` (the same recorded
 driver, processor and power limit as the second RTX 4090 host); `results/logs/README.md` lists which run used which.
 
-Two sessions of the same convolutions on the same GPU can disagree. On the RTX
-3090, 4 of 60 cells change winner between sessions, so single cells near
+Two sessions of the same convolutions on the same GPU model can disagree. On
+the RTX 3090, 4 of 60 cells change winner between sessions, so single cells near
 parity should not be read as settled; `bench/compare_devices.py` reports which
 cells two sessions agree on. The crossover, held-out and training sweep
 scripts alternate which algorithm is timed first, discard warm-up calls, and
 record driver, power limit, clocks and host processor with every row; the
 files in `results/host2/` carry these fields and the per-order ratios. The `rtx4090` files record the GPU and library versions only, the
 `rtx3090` files no machine fields, so that they and the Part I logs came from
-one machine is not recorded; "the RTX 3090 host" names the machine behind
-those files. Neither set
+one machine is not recorded; "the RTX 3090 host" names the machine or
+machines behind those files. Neither set
 was measured with alternating order. Across the two `results/host2/` sessions,
 which alternate, the order effect on dense cells has a median of 0.999 and
 ranges from 0.98 to 1.03.

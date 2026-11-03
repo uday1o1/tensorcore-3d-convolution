@@ -63,9 +63,10 @@ continued runs need the kernel 3 run's final checkpoint, so it trains first.
 
 ## Hosts
 
-PyTorch 2.11.0+cu128 (CUDA 12.8) with cuDNN 9.19.0 on each of the hosts below, so that
-cross-device differences are not library version; they remain host as well as
-GPU differences.
+PyTorch 2.11.0+cu128 (CUDA 12.8) with cuDNN 9.19.0 on each of the hosts below.
+The `rtx3090` benchmark files record no library versions, so cross-device
+differences remain host as well as GPU differences, and library version is
+excluded only as far as those files share the Part I host.
 
 - RTX 3090 host of the Part I measurement logs: driver 595.71.05
   (`measurements/host_rtx3090_main_versions.log`); the `rtx3090` benchmark

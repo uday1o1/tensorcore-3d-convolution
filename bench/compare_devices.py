@@ -93,11 +93,11 @@ def smallest_crossing(rows, key="ratio"):
 
 
 def session_agreement(maps, trains):
-    """Do two independent sessions on the same GPU agree on each winner?
+    """Do two independent sessions on the same GPU model agree on each winner?
 
     Each device's forward convolutions were measured twice: once in the
     crossover sweep and once as the forward-only timing in the training sweep.
-    Same shapes, same GPU, different session. Within-session
+    Same shapes, same GPU model, different session. Within-session
     trial spread cannot reveal session-to-session variation, since a
     consistently biased session is also consistent. Agreement between the two
     sessions can.
@@ -259,7 +259,7 @@ def main():
     trains_all = load("training_crossover")
     agree = session_agreement(maps, trains_all)
     if agree:
-        print("\nSESSION AGREEMENT, same GPU, same convolutions, two sessions")
+        print("\nSESSION AGREEMENT, same GPU model, same convolutions, two sessions")
         print(f"  {'device':<10}{'offset':>9}{'median dev':>12}{'p90 dev':>9}"
               f"{'winner changes':>16}")
         for tag, a in agree.items():

@@ -24,7 +24,7 @@ the scripts in `bench/` are their consolidated form.
 | `sweep_unverified_nnunet_shapes.log` | throughput reported before output was checked, 13483.6 TFLOPS on an nnU-Net shape |
 | `sweep_nonzero_check.log` | conv9 and the first nnU-Net shape with an output check: conv9 fully populated, the nnU-Net shape 0 of 124848000 outputs nonzero |
 | `generality_audit.log` | conv9 with batch, channels and extent varied one at a time: fraction of output computed |
-| `launch_geometry_conv9.log`, `launch_geometry_variants.log` | literal launch geometry in the released conv9 and conv4 kernels |
+| `launch_geometry_conv9.log`, `launch_geometry_variants.log` | literal launch geometry in the released conv9, conv4 and conv11 kernels |
 | `winconv_correctness_tf32_on.log`, `winconv_correctness_tf32_off.log` | windowed convolution against `F.conv2d`/`F.conv3d` with TF32 on (failures at 2.65e-04 to 5.55e-04) and off (0.00e+00 to 2.42e-06) |
 | `minmat_correctness.log` | minimal-materialization 3D path against `F.conv3d` |
 | `kernel_size_correctness_and_ratio.log` | correctness and cuDNN ratio across kernel sizes 3, 5, 7 |
