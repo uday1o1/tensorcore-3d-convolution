@@ -99,7 +99,7 @@ Two traps this code is built around:
 
 With TF32 disabled, the windowed (2D, 3D, minimal, depthwise), FFT and
 `WindowedConv3d` implementations match `F.conv2d` / `F.conv3d`
-to a relative error between 0.00e+00 and 2.42e-06 in the committed correctness
+to a relative error between 0.00e+00 and 2.42e-06 in the correctness
 logs (`results/logs/measurements/*correctness*.log`).
 
 ## Usage
